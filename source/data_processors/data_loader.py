@@ -1,7 +1,7 @@
 import requests
 import pandas as pd
 from functools import reduce
-from typing import List, Optional
+from typing import List, Optional, Dict
 from pathlib import Path
 import time
 
@@ -21,12 +21,13 @@ class DataLoader:
         self.end_year = end_year
         self.interval = interval
         self.delay = delay
-        self.save_path = self._save_dir / filename
         self.base_url = base_url
 
         self._session = None
         self._data : Dict[str, pd.DataFrame] = {}
         self._save_dir = Path(save_dir)
+        
+        self.save_path = self._save_dir / filename
 
     def load_all(
             self,
@@ -79,6 +80,7 @@ class DataLoader:
                 all_data.extend(year_data['data'])
 
         df = self._to_dataframe(all_data, columns, ticker)
+
         return df
 
     def _fetch_year(
@@ -137,6 +139,9 @@ class DataLoader:
             year_data.extend(candles['data'])
             params['start'] += len(candles['data'])
 
+            if len(candles['data']) < 500:
+                break
+        
         return {'columns' : year_columns, 'data' : year_data}
 
     @staticmethod

@@ -19,3 +19,6 @@ data/
 Thumbs.db
 *.log
 logs/
+.ipynb_checkpoints/
+.ipynb
+notebooks/

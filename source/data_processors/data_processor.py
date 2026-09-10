@@ -1,6 +1,6 @@
 import pandas as pd
 import numpy as np
-from typing import Tuple, Optional
+from typing import Tuple, Optional, List, Dict
 from pathlib import Path
 
 class DataProcessor:
@@ -32,9 +32,9 @@ class DataProcessor:
 
         for ticker in tickers:
             df_ticker = self._get_ticker_data(df_all, ticker)
-            df_processed = self.process_ticker(df_ticker, ticker)
-            self._results[ticker] = df_processed
-
+            df_processed_ticker = self.process_ticker(df_ticker, ticker)
+            self._results[ticker] = df_processed_ticker
+            self._save_rv(df_processed_ticker, ticker)
         self._save_rv_matrix(tickers)
         self._save_profitabilities_matrix(tickers)
 
@@ -43,7 +43,6 @@ class DataProcessor:
     def process_ticker(
             self,
             ticker_df : pd.DataFrame,
-            ticker : str,
             save_path : Optional[str] = None
         ) -> pd.DataFrame:
 
@@ -53,6 +52,8 @@ class DataProcessor:
         ticker_df = self._calculate_returns(ticker_df)
         ticker_df = self._filter_extreme_returns(ticker_df)
 
+        return ticker_df
+    
     def _load_data(
             self,
             input_file : str
@@ -85,30 +86,29 @@ class DataProcessor:
 
         ticker_df = df[['date', f'{ticker}_close']].copy()
         ticker_df = ticker_df.rename(columns = {f'{ticker}_close' : 'close'})
+        ticker_df['time'] = pd.to_datetime(ticker_df['date'])
         ticker_df.dropna(inplace = True)
-
+    
         return ticker_df
-
+    
     @staticmethod
-    def _prepare_data(
-            ticker_df : pd.DataFrame,
-    ) -> pd.DataFrame:
+    def _prepare_data(ticker_df: pd.DataFrame) -> pd.DataFrame:
         ticker_df = ticker_df.copy()
 
-        if 'time' in df.columns:
+        if 'time' in ticker_df.columns:
             ticker_df['time'] = pd.to_datetime(ticker_df['time'])
             ticker_df['date'] = ticker_df['time'].dt.date
         else:
             ticker_df['date'] = pd.to_datetime(ticker_df['date']).dt.date
 
-        if 'time' in df.columns:
+        if 'time' in ticker_df.columns:
             ticker_df = ticker_df.sort_values('time').reset_index(drop = True)
         else:
             ticker_df = ticker_df.sort_values('date').reset_index(drop = True)
 
         return ticker_df
-
-    def _filter_valid_days(
+    
+    def _filter_valid_dates(
             self,
             ticker_df : pd.DataFrame
     ) -> pd.DataFrame:
@@ -121,8 +121,28 @@ class DataProcessor:
 
         return ticker_df
 
-    # aggregate detection to all tickers
-    # def _detect_fat_finger
+    def _detect_fat_finger(
+            self,
+            ticker_df : pd.DataFrame
+    ) -> pd.DataFrame:
+        ticker_df = ticker_df.copy()
+        
+        results = ticker_df.groupby('date')['close'].apply(
+            lambda x : self._detect_fat_finger_single(
+                x.values, 
+                self.fat_finger_window, 
+                self.fat_finger_threshold)
+            )
+
+        ticker_df['processed_close'] = np.concatenate([result[0] for result in results])
+        ticker_df['fat_finger_flag'] = np.concatenate([result[1] for result in results])
+
+        number_of_fat_fingers = ticker_df['fat_finger_flag'].sum()
+
+        if number_of_fat_fingers:
+            print(f'{number_of_fat_fingers} fat finger values deleted')
+
+        return ticker_df
 
     @staticmethod
     def _detect_fat_finger_single(
@@ -148,20 +168,70 @@ class DataProcessor:
 
         return prices_processed, flags
 
-    #def _calculate_returns(self, df):
+    def _calculate_returns(
+        self, 
+        ticker_df : pd.DataFrame
+    ) -> pd.DataFrame:
+        
+        ticker_df = ticker_df.copy()
+        ticker_df['returns'] = np.log(ticker_df['processed_close'] / ticker_df.groupby('date')['processed_close'].shift(1)) * 100
 
-    #def _filter_extreme_returns(self, df):
+        return ticker_df
 
-    #def _save_rv_matrix(self):
+    def _filter_extreme_returns(
+            self, 
+            ticker_df : pd.DataFrame
+    ) -> pd.DataFrame:
 
-    #def _save_profitabilities_matrix(self):
+        ticker_df = ticker_df.copy()
+        ticker_df = ticker_df[ticker_df['returns'].abs() <= self.max_return]
+        ticker_df = ticker_df.dropna().reset_index(drop = True)
 
-    def _save(
+        return ticker_df
+
+    def _save_rv(
             self,
-            df: pd.DataFrame,
-            save_path : Path,
-            filename : str
-        ):
-            path = save_path / filename
-            path.parent.mkdir(parents = True, exist_ok = True)
-            df.to_csv(path, index = False)
+            ticker_df : pd.DataFrame,
+            ticker : str
+    ) -> None:
+
+        rv = ticker_df.groupby('date')['returns'].apply(lambda x : (x ** 2).sum()).reset_index()
+        rv.columns = ['date', 'RV']
+
+        path = self.output_dir / f'RV/{ticker}_RV.csv'
+        path.parent.mkdir(parents = True, exist_ok = True)
+        rv.to_csv(path, index = False)
+
+    def _save_rv_matrix(
+            self,
+            tickers : List[str]
+    ) -> None:
+
+        rv_list = []
+        for ticker in tickers:
+            rv = pd.read_csv(self.output_dir / f'RV/{ticker}_RV.csv')
+            rv = rv.rename(columns = {'RV' : f'{ticker}_RV'})
+            rv_list.append(rv)
+
+        rv_matrix = rv_list[0]
+        for rv in rv_list[1:]:
+            rv_matrix = pd.merge(rv_matrix, rv, on = 'date', how = 'inner')
+
+        rv_matrix.to_csv(self.output_dir / 'rv_matrix.csv', index = False)
+
+    def _save_profitabilities_matrix(
+            self,
+            tickers : List[str]
+    ) -> None:
+
+        profit_list = []
+        for ticker in tickers:
+            profits = self._results[ticker][['date', 'returns']].copy()
+            profits = profits.rename(columns = {'returns' : f'{ticker}_returns'})
+            profit_list.append(profits)
+
+        profit_matrix = profit_list[0]
+        for profit in profit_list[1:]:
+            profit_matrix = pd.merge(profit_matrix, profit, on = 'date', how = 'inner')
+
+        profit_matrix.to_csv(self.output_dir / 'profit_matrix.csv', index = False)
