@@ -5,13 +5,13 @@ from pathlib import Path
 
 class DataProcessor:
     def __init__(
-            self,
-            input_dir : str = 'data/raw/',
-            output_dir : str = 'data/processed/',
-            min_bars_per_day : int = 40,
-            fat_finger_window : int = 11,
-            fat_finger_threshold : float = 0.03,
-            max_return : float = 5.0,
+        self,
+        input_dir : str = 'data/raw/',
+        output_dir : str = 'data/processed/',
+        min_bars_per_day : int = 40,
+        fat_finger_window : int = 11,
+        fat_finger_threshold : float = 0.03,
+        max_return : float = 5.0,
     ):
         self.input_dir = Path(input_dir)
         self.output_dir = Path(output_dir)
@@ -23,8 +23,8 @@ class DataProcessor:
         self._results = {}
 
     def process_all(
-            self,
-            input_file : str = 'all_prices.csv'
+        self,
+        input_file : str = 'all_prices.csv'
     ) -> Dict[str, pd.DataFrame]:
         df_all = self._load_data(input_file)
 
@@ -41,10 +41,10 @@ class DataProcessor:
         return self._results
 
     def process_ticker(
-            self,
-            ticker_df : pd.DataFrame,
-            save_path : Optional[str] = None
-        ) -> pd.DataFrame:
+        self,
+        ticker_df : pd.DataFrame,
+        save_path : Optional[str] = None
+    ) -> pd.DataFrame:
 
         ticker_df = self._prepare_data(ticker_df)
         ticker_df = self._filter_valid_dates(ticker_df)
@@ -55,8 +55,8 @@ class DataProcessor:
         return ticker_df
     
     def _load_data(
-            self,
-            input_file : str
+        self,
+        input_file : str
     ) -> pd.DataFrame:
 
         path = self.input_dir / input_file
@@ -71,7 +71,7 @@ class DataProcessor:
 
     @staticmethod
     def _get_tickers_names(
-            df : pd.DataFrame
+        df : pd.DataFrame
     ) -> List[str]:
         ticker_cols = [col for col in df.columns if col.endswith('_close')]
         tickers = [col.replace('_close', '') for col in ticker_cols]
@@ -80,8 +80,8 @@ class DataProcessor:
 
     @staticmethod
     def _get_ticker_data(
-            df : pd.DataFrame,
-            ticker : str
+        df : pd.DataFrame,
+        ticker : str
     ) -> pd.DataFrame:
 
         ticker_df = df[['date', f'{ticker}_close']].copy()
@@ -109,8 +109,8 @@ class DataProcessor:
         return ticker_df
     
     def _filter_valid_dates(
-            self,
-            ticker_df : pd.DataFrame
+        self,
+        ticker_df : pd.DataFrame
     ) -> pd.DataFrame:
         ticker_df = ticker_df.copy()
 
@@ -122,8 +122,8 @@ class DataProcessor:
         return ticker_df
 
     def _detect_fat_finger(
-            self,
-            ticker_df : pd.DataFrame
+        self,
+        ticker_df : pd.DataFrame
     ) -> pd.DataFrame:
         ticker_df = ticker_df.copy()
         
@@ -146,9 +146,9 @@ class DataProcessor:
 
     @staticmethod
     def _detect_fat_finger_single(
-            prices : np.ndarray,
-            window_size : int,
-            threshold : float
+        prices : np.ndarray,
+        window_size : int,
+        threshold : float
     ) -> tuple:
 
         prices = np.asarray(prices, dtype = float)
@@ -179,8 +179,8 @@ class DataProcessor:
         return ticker_df
 
     def _filter_extreme_returns(
-            self, 
-            ticker_df : pd.DataFrame
+        self, 
+        ticker_df : pd.DataFrame
     ) -> pd.DataFrame:
 
         ticker_df = ticker_df.copy()
@@ -190,9 +190,9 @@ class DataProcessor:
         return ticker_df
 
     def _save_rv(
-            self,
-            ticker_df : pd.DataFrame,
-            ticker : str
+        self,
+        ticker_df : pd.DataFrame,
+        ticker : str
     ) -> None:
 
         rv = ticker_df.groupby('date')['returns'].apply(lambda x : (x ** 2).sum()).reset_index()
@@ -203,8 +203,8 @@ class DataProcessor:
         rv.to_csv(path, index = False)
 
     def _save_rv_matrix(
-            self,
-            tickers : List[str]
+        self,
+        tickers : List[str]
     ) -> None:
 
         rv_list = []
@@ -220,18 +220,21 @@ class DataProcessor:
         rv_matrix.to_csv(self.output_dir / 'rv_matrix.csv', index = False)
 
     def _save_profitabilities_matrix(
-            self,
-            tickers : List[str]
+        self,
+        tickers : List[str]
     ) -> None:
 
         profit_list = []
         for ticker in tickers:
-            profits = self._results[ticker][['date', 'returns']].copy()
+            profits = self._results[ticker][['time', 'returns']].copy()
             profits = profits.rename(columns = {'returns' : f'{ticker}_returns'})
             profit_list.append(profits)
 
         profit_matrix = profit_list[0]
         for profit in profit_list[1:]:
-            profit_matrix = pd.merge(profit_matrix, profit, on = 'date', how = 'inner')
+            profit_matrix = pd.merge(profit_matrix, profit, on = 'time', how = 'outer')
 
+        profit_matrix = profit_matrix.sort_values('time').reset_index(drop = True)
+        profit_matrix = profit_matrix.ffill()
+        profit_matrix = profit_matrix.dropna().reset_index(drop = True) 
         profit_matrix.to_csv(self.output_dir / 'profit_matrix.csv', index = False)

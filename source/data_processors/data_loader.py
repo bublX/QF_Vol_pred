@@ -30,8 +30,8 @@ class DataLoader:
         self.save_path = self._save_dir / filename
 
     def load_all(
-            self,
-            save_individual : bool = False
+        self,
+        save_individual : bool = False
     ) -> pd.DataFrame:
         self._init_session()
 
@@ -180,31 +180,16 @@ class DataLoader:
         return merged
 
     def _save(
-            self,
-            df : pd.DataFrame
+        self,
+        df : pd.DataFrame
     ):
         self.save_path.parent.mkdir(parents = True, exist_ok = True)
         df.to_csv(self.save_path, index = False)
 
     def _save_ticker(
-            self,
-            df : pd.DataFrame,
-            ticker : str
+        self,
+        df : pd.DataFrame,
+        ticker : str
     ):
         path = self.save_dir / f'{ticker}.csv'
         df.to_csv(path, index = False)
-
-    if __name__ == '__main__':
-        tickers = ['VTBR', 'SBER', 'LKOH', 'ROSN', 'NVTK', 'TATN', 'GAZP', 'GMKN', 'NLMK', 'MGNT']
-        loader = DataLoader(
-            tickers = tickers,
-            start_year = 2014,
-            end_year = 2025,
-            interval = 10,
-            delay = 0.2,
-            save_dir = 'data/raw/',
-            filename= 'all_prices.csv',
-            base_url = 'https://iss.moex.com/iss/engines/stock/markets/shares/boards/TQBR/securities'
-        )
-
-        df = loader.load_all()
