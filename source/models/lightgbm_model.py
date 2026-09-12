@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from typing import List, Tuple
-from lightgbm import LGBMRegressor, early_stopping
+from lightgbm import LGBMRegressor, early_stopping, log_evaluation
 from source.models.base import BaseModel
 
 class LightGBMModel(BaseModel):
@@ -40,14 +40,18 @@ class LightGBMModel(BaseModel):
         X : pd.DataFrame,
         y : pd.Series,
         eval_set : List[Tuple[pd.DataFrame, pd.Series]] = None,
-        callbacks : List = None
+        early_stopping_rounds : int = 50
     ) -> 'LightGBMModel':
 
         self._validate_input(X)
         self._feature_names = X.columns.to_list()
 
         if eval_set is not None:
-            self.model.fit(X, y, eval_set = eval_set, callbacks = callbacks)
+            X_valid, y_valid = eval_set[0]
+            eval_X = [X_valid.values]
+            eval_y = y_valid.values
+            callbacks = [early_stopping(early_stopping_rounds), log_evaluation(period = 0)]
+            self.model.fit(X, y, eval_X = eval_X, eval_y = eval_y, callbacks = callbacks)
         else:
             self.model.fit(X, y)
 

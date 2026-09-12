@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from typing import List, Tuple
-from xgboost import XGBRegressor
+import xgboost as xgb
 from source.models.base import BaseModel
 
 class XGBoostModel(BaseModel):
@@ -12,19 +12,21 @@ class XGBoostModel(BaseModel):
         learning_rate : float = 0.05,
         reg_alpha : float = 0.1,
         reg_lambda : float = 1,
+        early_stopping_rounds : int = 50,
         subsample : float = 0.8,
         colsample_bytree : float = 0.8,
         random_state : int = 42,
         **kwargs
     ):
         super().__init__('XGBoost')
-
-        self.model = XGBRegressor(
+        callbacks = [xgb.callback.EarlyStopping(rounds = early_stopping_rounds, save_best = True)]
+        self.model = xgb.XGBRegressor(
             n_estimators = n_estimators,
             max_depth = max_depth,
             learning_rate = learning_rate,
             reg_alpha = reg_alpha,            
             reg_lambda = reg_lambda, 
+            callbacks = callbacks,
             subsample = subsample, 
             colsample_bytree = colsample_bytree, 
             random_state = random_state,
@@ -37,14 +39,16 @@ class XGBoostModel(BaseModel):
         X : pd.DataFrame,
         y : pd.Series,
         eval_set : List[Tuple[pd.DataFrame, pd.Series]] = None,
-        early_stopping_round : int = 50,
         verbose : bool = False
     ) -> 'XGBoostModel':
         
         self._validate_input(X)
         self._feature_names = X.columns.to_list()
         if eval_set is not None:
-            self.model.fit(X, y, eval_set = eval_set, verbose = verbose)
+            self.model.fit(X, y, 
+                eval_set = eval_set, 
+                verbose = verbose
+                )
         else:
             self.model.fit(X, y)
 
