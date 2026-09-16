@@ -48,6 +48,6 @@ class MetricsCalculator:
             results[ticker] = self.calculate(
                 y_true_dict[ticker],
                 y_pred_dict[ticker]
-                )
+            )
 
         return results

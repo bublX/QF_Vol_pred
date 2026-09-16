@@ -191,5 +191,5 @@ class DataLoader:
         df : pd.DataFrame,
         ticker : str
     ):
-        path = self.save_dir / f'{ticker}.csv'
+        path = self._save_dir / f'{ticker}.csv'
         df.to_csv(path, index = False)
