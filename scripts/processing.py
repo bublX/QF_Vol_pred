@@ -9,10 +9,8 @@ def main():
     processor = DataProcessor(
         input_dir = 'data/raw/',
         output_dir = 'data/processed/',
-        min_bars_per_day = 40,
-        fat_finger_window = 11,
-        fat_finger_threshold = 0.03,
-        max_return = 5.0
+        fat_finger_type = 'standart',
+        use_rv_filter = True
     )
 
     results = processor.process_all('all_prices.csv')

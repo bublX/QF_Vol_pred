@@ -11,7 +11,11 @@ class DataProcessor:
         min_bars_per_day : int = 40,
         fat_finger_window : int = 11,
         fat_finger_threshold : float = 0.03,
-        max_return : float = 5.0,
+        max_return : float = 15.0,
+        fat_finger_type : str = 'standart',
+        fat_finger_sigma : float = 3.0,
+        hampel_const : float = 1.4826,
+        use_rv_filter : bool = False
     ):
         self.input_dir = Path(input_dir)
         self.output_dir = Path(output_dir)
@@ -19,6 +23,10 @@ class DataProcessor:
         self.fat_finger_window = fat_finger_window
         self.fat_finger_threshold = fat_finger_threshold
         self.max_return = max_return
+        self.fat_finger_type = fat_finger_type
+        self.fat_finger_sigma = fat_finger_sigma
+        self.hampel_const = hampel_const
+        self.use_rv_filter = use_rv_filter
 
         self._results = {}
 
@@ -47,6 +55,7 @@ class DataProcessor:
     ) -> pd.DataFrame:
 
         ticker_df = self._prepare_data(ticker_df)
+        ticker_df = self._filter_trading_hours(ticker_df)
         ticker_df = self._filter_valid_dates(ticker_df)
         ticker_df = self._detect_fat_finger(ticker_df)
         ticker_df = self._calculate_returns(ticker_df)
@@ -107,6 +116,25 @@ class DataProcessor:
             ticker_df = ticker_df.sort_values('date').reset_index(drop = True)
 
         return ticker_df
+
+    def _filter_trading_hours(
+        self,
+        ticker_df : pd.DataFrame,
+    ) -> pd.DataFrame:
+
+        ticker_df = ticker_df.copy()
+
+        if 'time' not in ticker_df.columns:
+            raise ValueError('Column "time" is not in data!')
+
+        time = pd.to_datetime(ticker_df['time'])
+        hour = time.dt.hour
+        minute = time.dt.minute
+
+        mask = (hour < 18) | ((hour == 18) & (minute <= 50))
+        ticker_df = ticker_df[mask].reset_index(drop = True)
+
+        return ticker_df
     
     def _filter_valid_dates(
         self,
@@ -126,14 +154,25 @@ class DataProcessor:
         ticker_df : pd.DataFrame
     ) -> pd.DataFrame:
         ticker_df = ticker_df.copy()
-        
-        results = ticker_df.groupby('date')['close'].apply(
-            lambda x : self._detect_fat_finger_single(
-                x.values, 
-                self.fat_finger_window, 
-                self.fat_finger_threshold)
-            )
 
+        if self.fat_finger_type == 'standart':
+            results = ticker_df.groupby('date')['close'].apply(
+                lambda x : self._detect_fat_finger_single(
+                    x.values, 
+                    self.fat_finger_window, 
+                    self.fat_finger_threshold)
+                )
+
+        elif self.fat_finger_type == 'hampel':
+            results = ticker_df.groupby('date')['close'].apply(
+                            lambda x : self._filter_hampel(
+                                x.values,
+                                self.fat_finger_window,
+                                self.fat_finger_sigma,
+                                self.hampel_const)
+                            )
+        else:
+            raise ValueError(f'Unknown filter type {self.fat_finger_type}')
         ticker_df['processed_close'] = np.concatenate([result[0] for result in results])
         ticker_df['fat_finger_flag'] = np.concatenate([result[1] for result in results])
 
@@ -168,6 +207,33 @@ class DataProcessor:
 
         return prices_processed, flags
 
+    @staticmethod
+    def _filter_hampel(
+        series : np.ndarray,
+        window_size : int = 11,
+        sigma : float = 3.0,
+        const : float = 1.4826
+    ) -> tuple:
+
+        series = np.asarray(series, dtype = float)
+        series_length = len(series)
+        cleaned = series.copy()
+        flags = np.zeros(series_length, dtype = bool)
+
+        for i in range(window_size, series_length - window_size):
+            window = series[i - window_size : i + window_size + 1]
+            r_median = np.median(window)
+            r_mad = np.median(np.abs(window - r_median))
+
+            if r_mad == 0:
+                continue
+
+            if np.abs(series[i] - r_median) > sigma * r_mad * const:
+                cleaned[i] = r_median
+                flags[i] = True
+
+        return cleaned, flags
+
     def _calculate_returns(
         self, 
         ticker_df : pd.DataFrame
@@ -197,6 +263,14 @@ class DataProcessor:
 
         rv = ticker_df.groupby('date')['returns'].apply(lambda x : (x ** 2).sum()).reset_index()
         rv.columns = ['date', 'RV']
+
+        if self.use_rv_filter:
+            rv['RV'] = self._filter_hampel(
+                rv['RV'].values,
+                self.fat_finger_window,
+                self.fat_finger_sigma,
+                self.hampel_const
+            )[0]
 
         path = self.output_dir / f'RV/{ticker}_RV.csv'
         path.parent.mkdir(parents = True, exist_ok = True)
