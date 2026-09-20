@@ -4,6 +4,37 @@ from typing import Tuple, Optional, List, Dict
 from pathlib import Path
 
 class DataProcessor:
+    """
+    Обработчик полученных данных с MOEX ISS API.
+
+    Parameters
+    ----------
+    input_dir : str
+        Директория для чтения
+    output_dir : str 
+        Директория для сохранения 
+    min_bars_per_day : int
+        Минимальное допустимое число сделок в день
+    fat_finger_window : int
+        Окно для обработки fat-finger ошибок
+    fat_finger_threshold : float
+        Порог для обработки fat-finger ошибок
+    max_return : float 
+        Максимальное допустимое значение доходностей
+    fat_finger_type : str 
+        Способ обработки fat-finger ошибок (standart или hampel)
+    fat_finger_sigma : float
+        Sigma значение для фильтра Хампеля
+    hampel_const : float 
+        Константа для фильтра Хампеля 
+    use_rv_filter : bool 
+        Флаг для использования фильтра Хампеля
+
+    Notes
+    -----
+    Фильтр `standart` заменяет выбросы на медиану окна.
+    Фильтр `hampel` использует MAD для адаптивного порога.
+    """
     def __init__(
         self,
         input_dir : str = 'data/raw/',
@@ -34,6 +65,19 @@ class DataProcessor:
         self,
         input_file : str = 'all_prices.csv'
     ) -> Dict[str, pd.DataFrame]:
+        """
+        Обработать все тикеры из файла.
+        
+        Parameters
+        ----------
+        input_file : str
+            Имя файла с сырыми данными
+        
+        Returns
+        -------
+        Dict[str, pd.DataFrame]
+            Словарь {тикер: обработанный DataFrame}
+        """
 
         df_all = self._load_data(input_file)
         tickers = self._get_tickers_names(df_all)
@@ -43,6 +87,7 @@ class DataProcessor:
             df_processed_ticker = self.process_ticker(df_ticker, ticker)
             self._results[ticker] = df_processed_ticker
             self._save_rv(df_processed_ticker, ticker)
+            
         self._save_rv_matrix(tickers)
         self._save_profitabilities_matrix(tickers)
 
@@ -53,6 +98,21 @@ class DataProcessor:
         ticker_df : pd.DataFrame,
         save_path : Optional[str] = None
     ) -> pd.DataFrame:
+        """
+        Обработать данные одного тикера.
+        
+        Parameters
+        ----------
+        ticker_df : pd.DataFrame
+            Данные тикера (date, close)
+        save_path : Optional[str]
+            Путь для сохранения (при желании)
+        
+        Returns
+        -------
+        pd.DataFrame
+            Обработанный DataFrame с колонками date, close, processed_close, returns
+        """
 
         ticker_df = self._prepare_data(ticker_df)
         ticker_df = self._filter_trading_hours(ticker_df)
@@ -67,10 +127,32 @@ class DataProcessor:
         self,
         input_file : str
     ) -> pd.DataFrame:
+        """
+        Загрузить данные из csv-файла.
+        
+        Parameters
+        ----------
+        input_file : str
+            Имя файла
+        
+        Returns
+        -------
+        pd.DataFrame
+            Загруженные данные
+        
+        Raises
+        ------
+        FileNotFoundError
+            Если файл не найден
+        ValueError
+            Если формат файла не CSV
+        """
 
         path = self.input_dir / input_file
+
         if not path.exists():
             raise FileNotFoundError(f'File is not found: {path}')
+        
         if path.suffix == '.csv':
             df = pd.read_csv(path)
         else:
@@ -82,6 +164,20 @@ class DataProcessor:
     def _get_tickers_names(
         df : pd.DataFrame
     ) -> List[str]:
+        """
+        Извлечь названия тикеров из колонок DataFrame.
+        
+        Parameters
+        ----------
+        df : pd.DataFrame
+            DataFrame с колонками date, {ticker}_close
+        
+        Returns
+        -------
+        List[str]
+            Список тикеров
+        """
+        
         ticker_cols = [col for col in df.columns if col.endswith('_close')]
         tickers = [col.replace('_close', '') for col in ticker_cols]
 
@@ -92,6 +188,21 @@ class DataProcessor:
         df : pd.DataFrame,
         ticker : str
     ) -> pd.DataFrame:
+        """
+        Извлечь данные одного тикера.
+        
+        Parameters
+        ----------
+        df : pd.DataFrame
+            Общий DataFrame
+        ticker : str
+            Название тикера
+        
+        Returns
+        -------
+        pd.DataFrame
+            DataFrame с колонками date, close, time
+        """
 
         ticker_df = df[['date', f'{ticker}_close']].copy()
         ticker_df = ticker_df.rename(columns = {f'{ticker}_close' : 'close'})
@@ -102,6 +213,20 @@ class DataProcessor:
     
     @staticmethod
     def _prepare_data(ticker_df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Подготовить данные: преобразовать date, отсортировать.
+        
+        Parameters
+        ----------
+        ticker_df : pd.DataFrame
+            Данные тикера
+        
+        Returns
+        -------
+        pd.DataFrame
+            Подготовленный DataFrame
+        """
+
         ticker_df = ticker_df.copy()
 
         ticker_df['date'] = pd.to_datetime(ticker_df['date']).dt.date
@@ -113,6 +238,24 @@ class DataProcessor:
         self,
         ticker_df : pd.DataFrame,
     ) -> pd.DataFrame:
+        """
+        Оставить только бары в торговые часы (10:00–18:50).
+        
+        Parameters
+        ----------
+        ticker_df : pd.DataFrame
+            Данные тикера
+        
+        Returns
+        -------
+        pd.DataFrame
+            Отфильтрованный DataFrame
+        
+        Raises
+        ------
+        ValueError
+            Если нет колонки time
+        """
 
         ticker_df = ticker_df.copy()
 
@@ -132,6 +275,20 @@ class DataProcessor:
         self,
         ticker_df : pd.DataFrame
     ) -> pd.DataFrame:
+        """
+        Оставить только дни с достаточным числом баров.
+        
+        Parameters
+        ----------
+        ticker_df : pd.DataFrame
+            Данные тикера
+        
+        Returns
+        -------
+        pd.DataFrame
+            Отфильтрованный DataFrame
+        """
+        
         ticker_df = ticker_df.copy()
 
         counts = ticker_df.groupby('date').size()
@@ -145,6 +302,28 @@ class DataProcessor:
         self,
         ticker_df : pd.DataFrame
     ) -> pd.DataFrame:
+        """
+        Обнаружить и исправить выбросы fat-finger.
+        
+        Parameters
+        ----------
+        ticker_df : pd.DataFrame
+            Данные тикера
+        
+        Returns
+        -------
+        pd.DataFrame
+            DataFrame с колонками processed_close, fat_finger_flag
+        
+        Raises
+        ------
+        ValueError
+            Если неизвестный тип фильтра
+
+        Notes
+        -----
+        Поддерживает несколько способов обработки (standart, hampel)
+        """
         
         ticker_df = ticker_df.copy()
 
@@ -181,7 +360,25 @@ class DataProcessor:
         prices : np.ndarray,
         window_size : int,
         threshold : float
-    ) -> tuple:
+    ) -> Tuple[np.ndarray, np.ndarray]:
+
+        """
+        Обнаружить выбросы в одном массиве цен (стандартный метод).
+        
+        Parameters
+        ----------
+        prices : np.ndarray
+            Массив цен
+        window_size : int
+            Размер окна
+        threshold : float
+            Порог отклонения
+        
+        Returns
+        -------
+        Tuple[np.ndarray, np.ndarray]
+            (cleaned, flags) — очищенные цены и флаги
+        """
 
         prices = np.asarray(prices, dtype = float)
         length = len(prices)
@@ -191,9 +388,11 @@ class DataProcessor:
         for idx in range(window_size, length - window_size):
             window = prices[idx - window_size : idx + window_size + 1]
             med = np.median(window)
+
             if med == 0:
                 continue
             diff = np.abs(prices[idx] - med) / med
+
             if diff > threshold:
                 flags[idx] = True
                 prices_processed[idx] = med
@@ -206,8 +405,27 @@ class DataProcessor:
         window_size : int = 11,
         sigma : float = 3.0,
         const : float = 1.4826
-    ) -> tuple:
-
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Фильтр Хампеля для обнаружения выбросов.
+        
+        Parameters
+        ----------
+        series : np.ndarray
+            Временной ряд
+        window_size : int
+            Размер окна
+        sigma : float
+            Порог в сигмах
+        const : float
+            Константа нормализации MAD
+        
+        Returns
+        -------
+        Tuple[np.ndarray, np.ndarray]
+            (cleaned, flags) — очищенный ряд и флаги для логирования
+        """
+        
         series = np.asarray(series, dtype = float)
         series_length = len(series)
         cleaned = series.copy()
@@ -231,6 +449,19 @@ class DataProcessor:
         self, 
         ticker_df : pd.DataFrame
     ) -> pd.DataFrame:
+        """
+        Рассчитать логарифмические доходности.
+        
+        Parameters
+        ----------
+        ticker_df : pd.DataFrame
+            Данные тикера
+        
+        Returns
+        -------
+        pd.DataFrame
+            DataFrame с колонкой returns
+        """
         
         ticker_df = ticker_df.copy()
         ticker_df['returns'] = np.log(ticker_df['processed_close'] / ticker_df.groupby('date')['processed_close'].shift(1)) * 100
@@ -241,6 +472,19 @@ class DataProcessor:
         self, 
         ticker_df : pd.DataFrame
     ) -> pd.DataFrame:
+        """
+        Удалить экстремальные доходности (|returns| > max_return).
+        
+        Parameters
+        ----------
+        ticker_df : pd.DataFrame
+            Данные тикера
+        
+        Returns
+        -------
+        pd.DataFrame
+            Отфильтрованный DataFrame
+        """
 
         ticker_df = ticker_df.copy()
         ticker_df = ticker_df[ticker_df['returns'].abs() <= self.max_return]
@@ -253,6 +497,20 @@ class DataProcessor:
         ticker_df : pd.DataFrame,
         ticker : str
     ) -> None:
+        """
+        Рассчитать RV и сохранить в CSV.
+        
+        Parameters
+        ----------
+        ticker_df : pd.DataFrame
+            Данные тикера
+        ticker : str
+            Название тикера
+        
+        Notes
+        -----
+        Если use_rv_filter = True, применяется фильтр Хампеля на RV.
+        """
 
         rv = ticker_df.groupby('date')['returns'].apply(lambda x : (x ** 2).sum()).reset_index()
         rv.columns = ['date', 'RV']
@@ -273,8 +531,17 @@ class DataProcessor:
         self,
         tickers : List[str]
     ) -> None:
-
+        """
+        Объединить RV всех тикеров в одну таблицу.
+        
+        Parameters
+        ----------
+        tickers : List[str]
+            Список тикеров
+        """
+        
         rv_list = []
+
         for ticker in tickers:
             rv = pd.read_csv(self.output_dir / f'RV/{ticker}_RV.csv')
             rv = rv.rename(columns = {'RV' : f'{ticker}_RV'})
@@ -290,8 +557,17 @@ class DataProcessor:
         self,
         tickers : List[str]
     ) -> None:
+        """
+        Объединить доходности всех тикеров в одну таблицу.
+        
+        Parameters
+        ----------
+        tickers : List[str]
+            Список тикеров
+        """
 
         profit_list = []
+
         for ticker in tickers:
             profits = self._results[ticker][['time', 'returns']].copy()
             profits = profits.rename(columns = {'returns' : f'{ticker}_returns'})

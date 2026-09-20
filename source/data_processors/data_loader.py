@@ -6,12 +6,35 @@ from pathlib import Path
 import time
 
 class DataLoader:
+    """
+    Загрузчик данных с MOEX ISS API.
+    
+    Parameters
+    ----------
+    tickers : List[str]
+        Список тикеров для загрузки
+    start_year : int
+        Начальный год
+    end_year : int
+        Конечный год
+    interval : int
+        Интервал между сделками
+    delay : float
+        Пауза между HTTP-запросами
+    save_dir : str
+        Директория для сохранения
+    filename : str
+        Имя файла
+    base_url : str
+        Ссылка для парсинга
+    """
+
     def __init__(self,
         tickers : List[str],
         start_year : int = 2014,
         end_year : int = 2025,
         interval : int = 10,
-        delay : float = 0.001,
+        delay : float = 0.01,
         save_dir : str = 'data/raw/',
         filename: str = 'all_prices.csv',
         base_url : str = 'https://iss.moex.com/iss/engines/stock/markets/shares/boards/TQBR/securities'
@@ -33,6 +56,20 @@ class DataLoader:
         self,
         save_individual : bool = False
     ) -> pd.DataFrame:
+        """
+        Загрузить все тикеры и объединить в DataFrame.
+        
+        Parameters
+        ----------
+        save_individual : bool
+            Индикатор для сохранения тикера
+
+        Returns
+        -------
+        pd.DataFrame
+            Объединенный DataFrame с колонками date, {ticker}_close
+        """
+
         self._init_session()
 
         for ticker in self.tickers:
@@ -49,9 +86,25 @@ class DataLoader:
         return merged_df
 
     def _init_session(self) -> None:
+        """
+        Создать HTTP-сессию для запросов к MOEX.
+
+        Notes
+        -----
+        Ускоряет запросы
+        """
+
         self._session = requests.Session()
 
     def _close_session(self) -> None:
+        """
+        Закрыть HTTP-сессию.
+
+        Notes
+        -----
+        Вызывается после завершения загрузки, чтобы освободить ресурсы.
+        """
+
         if self._session:
             self._session.close()
             self._session = None
@@ -60,6 +113,24 @@ class DataLoader:
         self,
         ticker : str
     ) -> pd.DataFrame:
+        """
+        Загрузить один тикер.
+
+        Parameters
+        ----------
+        ticker : str
+            Название тикера (например, 'VTBR')
+        
+        Returns
+        -------
+        pd.DataFrame 
+            DataFrame с колонками date, {ticker}_close
+
+        Notes
+        -----
+        Загрузка идет постранично: по 500 записей за запрос
+        """
+
         all_data = []
         columns = None
         url = f'{self.base_url}/{ticker}/candles.json'
@@ -89,6 +160,31 @@ class DataLoader:
         params : dict,
         columns : Optional[List[str]]
     ) -> dict:
+        """
+        Загрузить один год данных с пагинацией и retry-логикой.
+
+        Parameters
+        ----------
+        url : str
+            URL для запроса
+        params : dict
+            Параметры запроса (from, till, interval, start)
+        columns : Optional[List[str]]
+            Названия колонок (None при первом запросе)
+
+        Returns
+        -------
+        dict
+            {'columns': [...], 'data': [...]}
+
+        Raises
+        ------
+        RuntimeError
+            Если нет интернета или слишком много retry
+        ValueError
+            Если HTTP-ошибка, не связанная с 429
+        """
+
         year_data = []
         year_columns = None
         max_tries = 3
@@ -150,6 +246,24 @@ class DataLoader:
         columns : List[str],
         ticker : str
     ) -> pd.DataFrame:
+        """
+        Преобразовать сырые данные MOEX в DataFrame
+
+        Parameters
+        ----------
+        data : List
+            Список списков с данными (open, close, ..)
+        columns : List[str]
+            Названия колонок из ответа API
+        ticker : str
+            Название тикера
+
+        Returns
+        -------
+        pd.DataFrame
+            DataFrame с колонками date, {ticker}_close
+        """
+        
         if not data or columns is None:
             print(f'{ticker}: data is not found')
             return pd.DataFrame(columns = ['date', f'{ticker}_close'])
@@ -161,6 +275,20 @@ class DataLoader:
         return df
 
     def _merge_data(self) -> pd.DataFrame:
+        """
+        Объединить данные всех тикеров в один DataFrame.
+
+        Returns
+        -------
+        pd.DataFrame
+            Объединённый DataFrame с колонками date, {ticker}_close
+
+        Raises
+        ------
+        ValueError
+            Если данные пустые или не хватает колонок
+        """
+        
         if not self._data:
             raise ValueError('No data to merge')
 
@@ -182,14 +310,33 @@ class DataLoader:
     def _save(
         self,
         df : pd.DataFrame
-    ):
+    ) -> None:
+        """
+        Сохранить объединенный DataFrame в csv формат
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            Данные для сохранения
+        """
+        
         self.save_path.parent.mkdir(parents = True, exist_ok = True)
         df.to_csv(self.save_path, index = False)
 
     def _save_ticker(
         self,
-        df : pd.DataFrame,
+        ticker_df : pd.DataFrame,
         ticker : str
-    ):
+    ) -> None:
+        """
+        Сохранить данные одного тикера в отдельный csv
+
+        Parameters
+        ----------
+        ticker_df : pd.DataFrame
+            Данные для тикера
+        ticker : str
+            Название тикера
+        """
         path = self._save_dir / f'{ticker}.csv'
-        df.to_csv(path, index = False)
+        ticker_df.to_csv(path, index = False)
