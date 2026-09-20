@@ -2,9 +2,26 @@ import pandas as pd
 from typing import List, Tuple, Optional
 
 class DataSplitter:
+    """
+    Преобразователь данных перед обучением моделей машинного обучения
+
+    Parameters
+    ----------
+    train_end : str
+        Конец обучающей выборки (включительно)
+    valid_end : Optional[str]
+        Конец валидационной выборки.
+        Если None — валидация не используется.
+    
+    Notes
+    -----
+    Данные делятся строго по времени, без перемешивания.
+    Это важно для временных рядов, чтобы избежать утечки данных.
+    Поддерживается возможность отключения создания валидационной выборки.
+    """
     def __init__(
         self,
-        train_end : str = '2021-12-31',
+        train_end : str = '2023-12-31',
         valid_end : Optional[str] = '2023-12-31',
     ):
         self.train_end = train_end
@@ -15,7 +32,28 @@ class DataSplitter:
         df : pd.DataFrame,
         ticker : str,
         use_validation : bool = True 
-    ) -> Tuple:
+    ) -> Tuple[pd.DataFrame, Optional[pd.DataFrame], pd.DataFrame, 
+               pd.Series, Optional[pd.Series], pd.Series]:
+        """
+        Разделить данные одного тикера на train/valid/test.
+        
+        Parameters
+        ----------
+        df : pd.DataFrame
+            DataFrame с признаками и таргетом
+        ticker : str
+            Название тикера
+        use_validation : bool
+            Использовать ли валидационную выборку
+        
+        Returns
+        -------
+        Tuple
+            Если use_validation=True:
+                (X_train, X_valid, X_test, y_train, y_valid, y_test)
+            Если use_validation=False:
+                (X_train, None, X_test, y_train, None, y_test)
+        """
 
         feature_cols = [col for col in df.columns if col.startswith(ticker) and not col.endswith('_target')]
         target_col = f'{ticker}_target'
@@ -38,10 +76,11 @@ class DataSplitter:
             X_valid = df.loc[validation_mask, feature_cols]
             y_valid = df.loc[validation_mask, target_col]
 
-            return X_train, X_valid, X_test, y_train, y_valid, y_test
         else:
+            X_valid = None
+            y_valid = None
 
-            return X_train, X_test, y_train, y_test
+        return X_train, X_valid, X_test, y_train, y_valid, y_test
 
     def split_all(
         self,
@@ -49,10 +88,27 @@ class DataSplitter:
         tickers : List[str],
         use_validation : bool = True
     ) -> dict:
-            
-            result = {}
+        """
+        Разделить данные для всех тикеров.
+        
+        Parameters
+        ----------
+        df : pd.DataFrame
+            DataFrame с признаками и таргетами
+        tickers : List[str]
+            Список тикеров
+        use_validation : bool
+            Использовать ли валидационную выборку
+        
+        Returns
+        -------
+        dict
+            {тикер: (X_train, X_valid, X_test, y_train, y_valid, y_test)}
+        """
 
-            for ticker in tickers: 
-                result[ticker] = self.split(df, ticker, use_validation)
+        result = {}
+        
+        for ticker in tickers: 
+            result[ticker] = self.split(df, ticker, use_validation)
 
-            return result
+        return result

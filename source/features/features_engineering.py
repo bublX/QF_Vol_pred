@@ -1,10 +1,33 @@
 import pandas as pd
 import numpy as np
-from pathlib import Path
-from typing import List, Dict
+from typing import List
 from scipy.stats import skew
 
 class FeatureEngineer:
+    """
+    Генератор признаков для моделей прогнозирования RV.
+    
+    Parameters
+    ----------
+    num_lags : List[int]
+        Значения для лаговых признаков (по умолчанию [1, 2, 5, 10])
+    windows : List[int]
+        Окна для скользящих статистик (по умолчанию [5, 22])
+    ma_windows : List[int]
+        Окна для скользящих средних (по умолчанию [20, 50])
+    vol_ratio_windows : List[int]
+        Окна для vol_ratio (по умолчанию [10, 15, 20])
+    momentum_window : int
+        Окно для momentum (по умолчанию 20)
+    rsi_window : int
+        Окно для RSI (по умолчанию 14)
+    
+    Notes
+    -----
+    Признаки генерируются для каждого тикера отдельно.
+    Все признаки имеют префикс {ticker}_.
+    """
+
     def __init__(
         self,
         num_lags : List[int] = [1, 2, 5, 10],
@@ -25,6 +48,23 @@ class FeatureEngineer:
         self,
         df : pd.DataFrame
     ) -> pd.DataFrame:
+        """
+        Создать все признаки для всех тикеров.
+        
+        Parameters
+        ----------
+        df : pd.DataFrame
+            DataFrame с колонками date, {ticker}_RV
+        
+        Returns
+        -------
+        pd.DataFrame
+            DataFrame с признаками для всех тикеров
+        
+        Notes
+        -----
+        Удаляются строки с NaN, возникшие из-за rolling().
+        """
         
         df = df.copy()
         feature_dfs = [df[['date']]]
@@ -45,6 +85,21 @@ class FeatureEngineer:
         ticker_rv : pd.Series,
         ticker : str
     ) -> pd.DataFrame:
+        """
+        Создать признаки для одного тикера.
+        
+        Parameters
+        ----------
+        ticker_rv : pd.Series
+            Ряд RV для тикера
+        ticker : str
+            Название тикера
+        
+        Returns
+        -------
+        pd.DataFrame
+            DataFrame с признаками тикера
+        """
 
         features = {}
 
@@ -61,6 +116,21 @@ class FeatureEngineer:
         ticker_rv : pd.Series,
         ticker : str
     ) -> dict:
+        """
+        Создать HAR-признаки.
+        
+        Parameters
+        ----------
+        ticker_rv : pd.Series
+            Ряд RV для тикера
+        ticker : str
+            Название тикера
+        
+        Returns
+        -------
+        dict
+            Словарь с признаками rv_1, rv_5, rv_22
+        """
 
         return {
             f'{ticker}_rv_1' : ticker_rv,
@@ -73,6 +143,21 @@ class FeatureEngineer:
         ticker_rv : pd.Series,
         ticker : str
     ) -> dict:
+        """
+        Создать лаговые признаки.
+        
+        Parameters
+        ----------
+        ticker_rv : pd.Series
+            Ряд RV для тикера
+        ticker : str
+            Название тикера
+        
+        Returns
+        -------
+        dict
+            Словарь с признаками lag_{n}
+        """
 
         features = {}
 
@@ -86,6 +171,21 @@ class FeatureEngineer:
         ticker_rv : pd.Series,
         ticker : str
     ) -> dict:
+        """
+        Создать технические признаки (MA, momentum, vol_ratio).
+        
+        Parameters
+        ----------
+        ticker_rv : pd.Series
+            Ряд RV для тикера
+        ticker : str
+            Название тикера
+        
+        Returns
+        -------
+        dict
+            Словарь с техническими признаками
+        """
 
         features = {}
 
@@ -103,6 +203,25 @@ class FeatureEngineer:
         ticker_rv : pd.Series,
         ticker : str
     ) -> dict:
+        """
+        Создать статистические признаки (mean, std, min, max, skew).
+        
+        Parameters
+        ----------
+        ticker_rv : pd.Series
+            Ряд RV для тикера
+        ticker : str
+            Название тикера
+        
+        Returns
+        -------
+        dict
+            Словарь со статистическими признаками
+        
+        Notes
+        -----
+        `skew` считается с `min_periods=num` (полное окно).
+        """
 
         features = {}
 
@@ -111,7 +230,7 @@ class FeatureEngineer:
             features[f'{ticker}_rv_std_{num}'] = ticker_rv.rolling(num).std()
             features[f'{ticker}_rv_min_{num}'] = ticker_rv.rolling(num).min()
             features[f'{ticker}_rv_max_{num}'] = ticker_rv.rolling(num).max()
-            features[f'{ticker}_rv_skew_{num}'] = ticker_rv.rolling(num).apply(skew, raw = True)
+            features[f'{ticker}_rv_skew_{num}'] = ticker_rv.rolling(num, min_periods = num).apply(skew, raw = True)
 
         return features
 
@@ -120,6 +239,21 @@ class FeatureEngineer:
         ticker_rv : pd.Series,
         ticker : str
     ) -> dict:
+        """
+        Создать RSI-признак.
+        
+        Parameters
+        ----------
+        ticker_rv : pd.Series
+            Ряд RV для тикера
+        ticker : str
+            Название тикера
+        
+        Returns
+        -------
+        dict
+            Словарь с признаком rsi
+        """
         
         features = {}
 
@@ -135,6 +269,19 @@ class FeatureEngineer:
         self, 
         df : pd.DataFrame
     ) -> pd.DataFrame:
+        """
+        Создать целевую переменную (RV на следующий день).
+        
+        Parameters
+        ----------
+        df : pd.DataFrame
+            DataFrame с колонками date, {ticker}_RV
+        
+        Returns
+        -------
+        pd.DataFrame
+            DataFrame с колонками date, {ticker}_target
+        """
 
         df = df.copy()
         tickers = [col.replace('_RV', '') for col in df.columns if col.endswith('_RV')]
@@ -153,5 +300,20 @@ class FeatureEngineer:
         df_features : pd.DataFrame,
         df_targets : pd.DataFrame
     ) -> pd.DataFrame:
+        """
+        Объединить признаки и таргеты по дате.
+        
+        Parameters
+        ----------
+        df_features : pd.DataFrame
+            Признаки
+        df_targets : pd.DataFrame
+            Таргеты
+        
+        Returns
+        -------
+        pd.DataFrame
+            Объединённый DataFrame
+        """
 
         return pd.merge(df_features, df_targets, on = 'date', how = 'inner')
