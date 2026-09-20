@@ -1,7 +1,6 @@
 import sys
 from pathlib import Path
 import pandas as pd
-import numpy as np
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -27,7 +26,7 @@ def main():
         valid_end = '2023-12-31'
     )
 
-    splits = splitter.split_all(df, tickers, use_validation = False)
+    splits = splitter.split_all(df, tickers, use_validation = True)
 
     calculator = MetricsCalculator()
 
