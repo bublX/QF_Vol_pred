@@ -34,8 +34,8 @@ class DataProcessor:
         self,
         input_file : str = 'all_prices.csv'
     ) -> Dict[str, pd.DataFrame]:
-        df_all = self._load_data(input_file)
 
+        df_all = self._load_data(input_file)
         tickers = self._get_tickers_names(df_all)
 
         for ticker in tickers:
@@ -104,16 +104,8 @@ class DataProcessor:
     def _prepare_data(ticker_df: pd.DataFrame) -> pd.DataFrame:
         ticker_df = ticker_df.copy()
 
-        if 'time' in ticker_df.columns:
-            ticker_df['time'] = pd.to_datetime(ticker_df['time'])
-            ticker_df['date'] = ticker_df['time'].dt.date
-        else:
-            ticker_df['date'] = pd.to_datetime(ticker_df['date']).dt.date
-
-        if 'time' in ticker_df.columns:
-            ticker_df = ticker_df.sort_values('time').reset_index(drop = True)
-        else:
-            ticker_df = ticker_df.sort_values('date').reset_index(drop = True)
+        ticker_df['date'] = pd.to_datetime(ticker_df['date']).dt.date
+        ticker_df = ticker_df.sort_values('date').reset_index(drop = True)
 
         return ticker_df
 
@@ -153,6 +145,7 @@ class DataProcessor:
         self,
         ticker_df : pd.DataFrame
     ) -> pd.DataFrame:
+        
         ticker_df = ticker_df.copy()
 
         if self.fat_finger_type == 'standart':

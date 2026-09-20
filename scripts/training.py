@@ -27,7 +27,7 @@ def main():
         valid_end = '2023-12-31'
     )
 
-    splits = splitter.split_all(df, tickers, use_validation = True)
+    splits = splitter.split_all(df, tickers, use_validation = False)
 
     calculator = MetricsCalculator()
 

@@ -11,7 +11,7 @@ class DataLoader:
         start_year : int = 2014,
         end_year : int = 2025,
         interval : int = 10,
-        delay : float = 0.2,
+        delay : float = 0.001,
         save_dir : str = 'data/raw/',
         filename: str = 'all_prices.csv',
         base_url : str = 'https://iss.moex.com/iss/engines/stock/markets/shares/boards/TQBR/securities'
