@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+from source.utils.logger import Logger
 from typing import Tuple, Optional, List, Dict
 from pathlib import Path
 
@@ -58,6 +59,7 @@ class DataProcessor:
         self.fat_finger_sigma = fat_finger_sigma
         self.hampel_const = hampel_const
         self.use_rv_filter = use_rv_filter
+        self.logger = Logger('DataProcessor')
 
         self._results = {}
 
@@ -79,17 +81,22 @@ class DataProcessor:
             Словарь {тикер: обработанный DataFrame}
         """
 
+        self.logger.info(f'Обработка {input_file}')
+
         df_all = self._load_data(input_file)
         tickers = self._get_tickers_names(df_all)
 
         for ticker in tickers:
+            self.logger.step('PROCESS', f'Обрабатывается {ticker}')
             df_ticker = self._get_ticker_data(df_all, ticker)
             df_processed_ticker = self.process_ticker(df_ticker, ticker)
             self._results[ticker] = df_processed_ticker
             self._save_rv(df_processed_ticker, ticker)
+            self.logger.success(f'{ticker}: RV сохранен')
             
         self._save_rv_matrix(tickers)
         self._save_profitabilities_matrix(tickers)
+        self.logger.success("Матрицы сохранены")
 
         return self._results
 
@@ -229,8 +236,16 @@ class DataProcessor:
 
         ticker_df = ticker_df.copy()
 
-        ticker_df['date'] = pd.to_datetime(ticker_df['date']).dt.date
-        ticker_df = ticker_df.sort_values('date').reset_index(drop = True)
+        if 'time' in ticker_df.columns:
+            ticker_df['time'] = pd.to_datetime(ticker_df['time'])
+            ticker_df['date'] = ticker_df['time'].dt.date
+        else:
+            ticker_df['date'] = pd.to_datetime(ticker_df['date']).dt.date
+
+        if 'time' in ticker_df.columns:
+            ticker_df = ticker_df.sort_values('time').reset_index(drop = True)
+        else:
+            ticker_df = ticker_df.sort_values('date').reset_index(drop = True)
 
         return ticker_df
 
@@ -351,7 +366,7 @@ class DataProcessor:
         number_of_fat_fingers = ticker_df['fat_finger_flag'].sum()
 
         if number_of_fat_fingers:
-            print(f'{number_of_fat_fingers} fat finger values deleted')
+            self.logger.warning(f"Fat-finger: {number_of_fat_fingers} замен")
 
         return ticker_df
 

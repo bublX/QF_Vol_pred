@@ -1,9 +1,10 @@
 import requests
 import pandas as pd
+import time
 from functools import reduce
 from typing import List, Optional, Dict
 from pathlib import Path
-import time
+from source.utils.logger import Logger
 
 class DataLoader:
     """
@@ -45,6 +46,7 @@ class DataLoader:
         self.interval = interval
         self.delay = delay
         self.base_url = base_url
+        self.logger = Logger('DataLoader')
 
         self._session = None
         self._data : Dict[str, pd.DataFrame] = {}
@@ -70,13 +72,17 @@ class DataLoader:
             Объединенный DataFrame с колонками date, {ticker}_close
         """
 
+        self.logger.info(f"Загрузка {len(self.tickers)} тикеров")
         self._init_session()
 
         for ticker in self.tickers:
+            self.logger.step("LOADING", f"Загружается {ticker}")
             df_ticker = self._load_ticker(ticker)
             self._data[ticker] = df_ticker
             if save_individual:
                 self._save_ticker(df_ticker, ticker)
+            self.logger.success(f"{ticker}: {len(df_ticker):,} строк")
+            
         self._close_session()
         merged_df = self._merge_data()
 

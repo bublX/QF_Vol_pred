@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+from source.utils.logger import Logger
 from typing import List
 from scipy.stats import skew
 
@@ -43,6 +44,7 @@ class FeatureEngineer:
         self.vol_ratio_windows = vol_ratio_windows
         self.num_lags = num_lags
         self.windows = windows
+        self.logger = Logger('FeatureEngineer')
 
     def create_features(
         self,
@@ -65,19 +67,23 @@ class FeatureEngineer:
         -----
         Удаляются строки с NaN, возникшие из-за rolling().
         """
-        
+
+        self.logger.info("Генерация признаков")
+
         df = df.copy()
         feature_dfs = [df[['date']]]
         tickers = [col.replace('_RV', '') for col in df.columns if col.endswith('_RV')]
 
         for ticker in tickers:
+            self.logger.step("FEATURES", f"Генерируются признаки для {ticker}")
             ticker_rv = df[f'{ticker}_RV']
             ticker_features = self._create_ticker_features(ticker_rv, ticker)
             feature_dfs.append(ticker_features)
 
         result = pd.concat(feature_dfs, axis = 1)
         result = result.dropna().reset_index(drop = True)
-
+        self.logger.success(f"Признаки: {result.shape}")
+        
         return result
 
     def _create_ticker_features(
