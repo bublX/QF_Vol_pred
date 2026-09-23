@@ -1,3 +1,4 @@
+```text
 QF_Vol_pred/
 │
 ├── source/                          # Главная папка с исходным кодом
@@ -53,3 +54,4 @@ QF_Vol_pred/
 │       └── featureengineer.log
 |
 └──  .gitignore                       # Исключения для Git
+```
