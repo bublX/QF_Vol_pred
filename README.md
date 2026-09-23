@@ -41,17 +41,17 @@ QF_Vol_pred/
 │       
 │
 ├── notebooks/                       # Jupyter ноутбуки
-│   ├── 00_test_pipeline.ipynb        # Проверка загрузки
-│   ├── 01_visualization.ipynb     # Визуализация
-│   └── 02_correlations.ipynb                 # Корреляции
+│   ├── 00_test_pipeline.ipynb       # Проверка загрузки
+│   ├── 01_visualization.ipynb       # Визуализация
+│   └── 02_correlations.ipynb        # Корреляции
 │
 ├── reports/                         # Отчёты и графики
-│   ├── images/                     # Графики
-│   ├── correlations/             # Корреляции 
+│   ├── images/                      # Графики
+│   ├── correlations/                # Корреляции 
 │   └── logs/                        # Логи работы
 │       ├── dataloader.log
 │       ├── dataprocessor.log
 │       └── featureengineer.log
 |
-└──  .gitignore                       # Исключения для Git
+└──  .gitignore                      # Исключения для Git
 ```
