@@ -38,7 +38,7 @@ class DataLoader:
         delay : float = 0.01,
         save_dir : str = 'data/raw/',
         filename: str = 'all_prices.csv',
-        base_url : str = 'https://iss.moex.com/iss/engines/stock/markets/shares/boards/TQBR/securities'
+        base_url : str = 'https://iss.moex.com/iss/engines/stock/markets/shares/securities'
     ):
         self.tickers = tickers
         self.start_year = start_year

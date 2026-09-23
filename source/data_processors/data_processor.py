@@ -120,7 +120,7 @@ class DataProcessor:
         pd.DataFrame
             Обработанный DataFrame с колонками date, close, processed_close, returns
         """
-
+    
         ticker_df = self._prepare_data(ticker_df)
         ticker_df = self._filter_trading_hours(ticker_df)
         ticker_df = self._filter_valid_dates(ticker_df)
@@ -213,7 +213,6 @@ class DataProcessor:
 
         ticker_df = df[['date', f'{ticker}_close']].copy()
         ticker_df = ticker_df.rename(columns = {f'{ticker}_close' : 'close'})
-        ticker_df['time'] = pd.to_datetime(ticker_df['date'])
         ticker_df.dropna(inplace = True)
     
         return ticker_df
@@ -236,16 +235,8 @@ class DataProcessor:
 
         ticker_df = ticker_df.copy()
 
-        if 'time' in ticker_df.columns:
-            ticker_df['time'] = pd.to_datetime(ticker_df['time'])
-            ticker_df['date'] = ticker_df['time'].dt.date
-        else:
-            ticker_df['date'] = pd.to_datetime(ticker_df['date']).dt.date
-
-        if 'time' in ticker_df.columns:
-            ticker_df = ticker_df.sort_values('time').reset_index(drop = True)
-        else:
-            ticker_df = ticker_df.sort_values('date').reset_index(drop = True)
+        ticker_df['date'] = pd.to_datetime(ticker_df['date'])
+        ticker_df = ticker_df.sort_values('date').reset_index(drop=True)
 
         return ticker_df
 
@@ -274,12 +265,8 @@ class DataProcessor:
 
         ticker_df = ticker_df.copy()
 
-        if 'time' not in ticker_df.columns:
-            raise ValueError('Column "time" is not in data!')
-
-        time = pd.to_datetime(ticker_df['time'])
-        hour = time.dt.hour
-        minute = time.dt.minute
+        hour = ticker_df['date'].dt.hour
+        minute = ticker_df['date'].dt.minute
 
         mask = (hour < 18) | ((hour == 18) & (minute <= 50))
         ticker_df = ticker_df[mask].reset_index(drop = True)
@@ -306,9 +293,10 @@ class DataProcessor:
         
         ticker_df = ticker_df.copy()
 
-        counts = ticker_df.groupby('date').size()
+        counts = ticker_df.groupby(ticker_df['date'].dt.date).size()
         valid_dates = counts[counts >= self.min_bars_per_day].index
-        ticker_df = ticker_df[ticker_df['date'].isin(valid_dates)]
+
+        ticker_df = ticker_df[ticker_df['date'].dt.date.isin(valid_dates)]
         ticker_df.reset_index(inplace = True, drop = True)
 
         return ticker_df
@@ -343,7 +331,7 @@ class DataProcessor:
         ticker_df = ticker_df.copy()
 
         if self.fat_finger_type == 'standart':
-            results = ticker_df.groupby('date')['close'].apply(
+            results = ticker_df.groupby(ticker_df['date'].dt.date)['close'].apply(
                 lambda x : self._detect_fat_finger_single(
                     x.values, 
                     self.fat_finger_window, 
@@ -351,7 +339,7 @@ class DataProcessor:
                 )
 
         elif self.fat_finger_type == 'hampel':
-            results = ticker_df.groupby('date')['close'].apply(
+            results = ticker_df.groupby(ticker_df['date'].dt.date)['close'].apply(
                             lambda x : self._filter_hampel(
                                 x.values,
                                 self.fat_finger_window,
@@ -479,7 +467,7 @@ class DataProcessor:
         """
         
         ticker_df = ticker_df.copy()
-        ticker_df['returns'] = np.log(ticker_df['processed_close'] / ticker_df.groupby('date')['processed_close'].shift(1)) * 100
+        ticker_df['returns'] = np.log(ticker_df['processed_close'] / ticker_df.groupby(ticker_df['date'].dt.date)['processed_close'].shift(1)) * 100
 
         return ticker_df
 
@@ -527,8 +515,9 @@ class DataProcessor:
         Если use_rv_filter = True, применяется фильтр Хампеля на RV.
         """
 
-        rv = ticker_df.groupby('date')['returns'].apply(lambda x : (x ** 2).sum()).reset_index()
+        rv = ticker_df.groupby(ticker_df['date'].dt.date)['returns'].apply(lambda x : (x ** 2).sum()).reset_index()
         rv.columns = ['date', 'RV']
+        rv['date'] = pd.to_datetime(rv['date'])
 
         if self.use_rv_filter:
             rv['RV'] = self._filter_hampel(
@@ -564,7 +553,11 @@ class DataProcessor:
 
         rv_matrix = rv_list[0]
         for rv in rv_list[1:]:
-            rv_matrix = pd.merge(rv_matrix, rv, on = 'date', how = 'inner')
+            rv_matrix = pd.merge(rv_matrix, rv, on = 'date', how = 'outer')
+
+        rv_matrix = rv_matrix.sort_values('date').reset_index(drop = True)
+        rv_matrix = rv_matrix.ffill()
+        rv_matrix = rv_matrix.dropna().reset_index(drop = True)
 
         rv_matrix.to_csv(self.output_dir / 'rv_matrix.csv', index = False)
 
@@ -584,15 +577,12 @@ class DataProcessor:
         profit_list = []
 
         for ticker in tickers:
-            profits = self._results[ticker][['time', 'returns']].copy()
+            profits = self._results[ticker][['date', 'returns']].copy()
             profits = profits.rename(columns = {'returns' : f'{ticker}_returns'})
             profit_list.append(profits)
 
         profit_matrix = profit_list[0]
         for profit in profit_list[1:]:
-            profit_matrix = pd.merge(profit_matrix, profit, on = 'time', how = 'outer')
+            profit_matrix = pd.merge(profit_matrix, profit, on = 'date', how = 'inner')
 
-        profit_matrix = profit_matrix.sort_values('time').reset_index(drop = True)
-        profit_matrix = profit_matrix.ffill()
-        profit_matrix = profit_matrix.dropna().reset_index(drop = True) 
         profit_matrix.to_csv(self.output_dir / 'profit_matrix.csv', index = False)
