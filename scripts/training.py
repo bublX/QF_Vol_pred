@@ -15,7 +15,7 @@ def main():
     engineer = FeatureEngineer()
     features = engineer.create_features(rv_matrix)
     targets = engineer.create_targets(rv_matrix)
-
+    
     df = engineer.merge_features_targets(features, targets)
 
     tickers = ['VTBR', 'SBER', 'LKOH', 'ROSN', 'NVTK',
@@ -26,7 +26,7 @@ def main():
         valid_end = '2023-12-31'
     )
 
-    splits = splitter.split_all(df, tickers, use_validation = True)
+    splits = splitter.split_all(df, tickers, use_validation = False)
 
     calculator = MetricsCalculator()
 

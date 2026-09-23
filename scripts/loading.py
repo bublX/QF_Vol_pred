@@ -15,7 +15,7 @@ def main():
         start_year = 2014,
         end_year = 2025,
         interval = 10,
-        delay = 0.2,
+        delay = 0.01,
         save_dir = 'data/raw/', 
         filename = 'all_prices.csv'
     )

@@ -72,7 +72,7 @@ class Logger:
             Текст выводимого сообщения
         """
 
-        self.logger.info(f'{msg}')
+        self.logger.info(f" {msg}")
 
     def success(self, msg: str):
         """
@@ -83,7 +83,7 @@ class Logger:
             Текст выводимого сообщения
         """
 
-        self.logger.info(f'{msg}')
+        self.logger.info(f" {msg}")
     
     def warning(self, msg: str):
         """
@@ -95,7 +95,7 @@ class Logger:
             Текст выводимого сообщения
         """
 
-        self.logger.warning(f'{msg}')
+        self.logger.warning(f" {msg}")
     
     def error(self, msg: str):
         """
@@ -107,7 +107,7 @@ class Logger:
             Текст выводимого сообщения
         """
 
-        self.logger.error(f'{msg}')
+        self.logger.error(f" {msg}")
     
     def debug(self, msg: str):
         """
@@ -119,7 +119,7 @@ class Logger:
             Текст выводимого сообщения
         """
 
-        self.logger.debug(f'{msg}')
+        self.logger.debug(f" {msg}")
     
     def step(self, 
              step: str, 
@@ -135,6 +135,6 @@ class Logger:
             Текст выводимого сообщения
         """
 
-        self.logger.info(f'[{step}] {msg}')
+        self.logger.info(f" [{step}] {msg}")
 
         
