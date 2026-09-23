@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from abc import ABC, abstractmethod
 from typing import Optional, List
+from source.utils.logger import Logger
 
 class BaseModel(ABC):
     """
@@ -30,6 +31,7 @@ class BaseModel(ABC):
         self.model = None
         self.is_trained = False
         self._feature_names = None
+        self.logger = Logger(name)
 
     @abstractmethod
     def fit(
@@ -122,11 +124,13 @@ class BaseModel(ABC):
             Если X пустой
         """
 
-        if not isinstance (X, pd.DataFrame):
-            raise TypeError(f'Waiting pd.DataFrame, but actually get {type(X)}!')
+        if not isinstance(X, pd.DataFrame):
+            self.logger.error(f"Ожидается DataFrame, получено {type(X)}")
+            raise TypeError(f'Ожидается DataFrame, получено {type(X)}!')
         
-        if X.empty: 
-            raise ValueError('Features are empty!')
+        if X.empty:
+            self.logger.error("Признаки пустые!")
+            raise ValueError('Признаки пустые!')
 
     def _check_is_trained(self) -> None:
         """
@@ -138,7 +142,8 @@ class BaseModel(ABC):
             Если модель не обучена
         """
         if not self.is_trained:
-            raise ValueError(f'Model {self.name} is not trained. Call fit() to train.')
+            self.logger.error(f"Модель {self.name} не обучена")
+            raise ValueError(f'Модель {self.name} не обучена. Вызовите fit().')
         
     def __repr__(self) -> str:
         """

@@ -1,5 +1,8 @@
 import pandas as pd
 import numpy as np
+import warnings
+warnings.filterwarnings('ignore', category = RuntimeWarning, message = '.*Precision loss.*')
+
 from source.utils.logger import Logger
 from typing import List
 from scipy.stats import skew

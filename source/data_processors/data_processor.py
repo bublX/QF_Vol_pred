@@ -158,12 +158,14 @@ class DataProcessor:
         path = self.input_dir / input_file
 
         if not path.exists():
-            raise FileNotFoundError(f'File is not found: {path}')
+            self.logger.error(f"Файл не найден: {path}")
+            raise FileNotFoundError(f'Файл не найден: {path}')
         
         if path.suffix == '.csv':
             df = pd.read_csv(path)
         else:
-            raise ValueError(f'Format is incorrect: {path.suffix}')
+            self.logger.error(f"Неверный формат: {path.suffix}")
+            raise ValueError(f'Неверный формат: {path.suffix}')
 
         return df
 
@@ -347,7 +349,9 @@ class DataProcessor:
                                 self.hampel_const)
                             )
         else:
-            raise ValueError(f'Unknown filter type {self.fat_finger_type}')
+            self.logger.error(f"Неизвестный тип фильтра: {self.fat_finger_type}")
+            raise ValueError(f'Неизвестный тип фильтра: {self.fat_finger_type}')
+        
         ticker_df['processed_close'] = np.concatenate([result[0] for result in results])
         ticker_df['fat_finger_flag'] = np.concatenate([result[1] for result in results])
 

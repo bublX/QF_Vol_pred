@@ -202,31 +202,38 @@ class DataLoader:
                 response.raise_for_status()
 
             except requests.exceptions.ConnectionError:
-                raise RuntimeError('No Internet connection!') from None
+                self.logger.error('Нет интернет соединения!')
+                raise RuntimeError('Нет интернет соединения!') from None
 
             except requests.exceptions.HTTPError as excep:
                 if excep.response.status_code == 429:
                     retry_count += 1
+                    self.logger.warning(f"HTTP 429: попытка {retry_count}/{max_tries}")
                     if retry_count > max_tries:
-                        raise RuntimeError(f'Too many 429 errors after {max_tries} retries') from excep
-                    print(f'HTTP error 429. Retry {retry_count}/{max_tries} in 5 seconds')
+                        self.logger.error(f"429: превышено {max_tries} попыток")
+                        raise RuntimeError(f'Много запросов 429 ошибка после {max_tries} попыток') from excep
                     time.sleep(5)
                     continue
-                raise ValueError(f'HTTP error: {excep}') from excep
+                else:
+                    self.logger.error(f'HTTP ошибка: {excep}')
+                    raise ValueError(f'HTTP ошибка: {excep}') from excep
 
             except requests.exceptions.Timeout:
                 retry_count += 1
+                self.logger.warning(f"Timeout: пробую снова {retry_count}/{max_tries}")
                 if retry_count > max_tries:
-                    raise RuntimeError(f'Timeout after {max_tries} retries')
-                print(f'Timeout. Retry {retry_count}/{max_tries} in 2s...')
+                    self.logger.error(f"Timeout после {max_tries} попыток")
+                    raise RuntimeError(f'Timeout после {max_tries} попыток')
+                self.logger.warning(f'Timeout. Попытка {retry_count}/{max_tries} через 2 секунды')
                 time.sleep(2)
                 continue
 
             except requests.exceptions.RequestException as excep:
                 retry_count += 1
                 if retry_count > max_tries:
-                    raise RuntimeError(f'Failed after {max_tries} retries') from excep
-                print(f'Request error: {excep}. Retry {retry_count}/{max_tries} in 2 seconds')
+                    self.logger.error(f"Ошибка запроса после {max_tries} попыток: {excep}")
+                    raise RuntimeError(f'Ошибка после {max_tries} попыток') from excep
+                self.logger.warning(f"Ошибка запроса: {excep}. Попытка {retry_count}/{max_tries}")
                 time.sleep(2)
                 continue
 
@@ -246,8 +253,8 @@ class DataLoader:
         
         return {'columns' : year_columns, 'data' : year_data}
 
-    @staticmethod
     def _to_dataframe(
+        self,
         data : List,
         columns : List[str],
         ticker : str
@@ -271,7 +278,7 @@ class DataLoader:
         """
         
         if not data or columns is None:
-            print(f'{ticker}: data is not found')
+            self.logger.warning(f'{ticker}: данные не найдены')
             return pd.DataFrame(columns = ['date', f'{ticker}_close'])
         df = pd.DataFrame(data, columns = columns)
         df = df[['end', 'close']].rename(columns = {'end' : 'date', 'close' : f'{ticker}_close'})
@@ -296,7 +303,8 @@ class DataLoader:
         """
         
         if not self._data:
-            raise ValueError('No data to merge')
+            self.logger.error("Нет данных для объединения")
+            raise ValueError('Нет данных для объединения')
 
         dfs = list(self._data.values())
 
@@ -308,7 +316,8 @@ class DataLoader:
         missing_cols = [col for col in columns if col not in merged.columns]
 
         if missing_cols:
-            raise ValueError(f'Required columns not found: {missing_cols}. Available columns: {list(merged.columns)}')
+            self.logger.error(f"Не хватает колонок: {missing_cols}")
+            raise ValueError(f'Не хватает колонок: {missing_cols}. Доступные колонки: {list(merged.columns)}')
         merged = merged[columns]
 
         return merged
