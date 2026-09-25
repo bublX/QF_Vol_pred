@@ -143,8 +143,8 @@ class FeatureEngineer:
 
         return {
             f'{ticker}_rv_1' : ticker_rv,
-            f'{ticker}_rv_5' : ticker_rv.rolling(5).sum(),
-            f'{ticker}_rv_22' : ticker_rv.rolling(22).sum()
+            f'{ticker}_rv_5' : ticker_rv.rolling(5).mean(),
+            f'{ticker}_rv_22' : ticker_rv.rolling(22).mean()
         }
 
     def _create_lag_features(
@@ -326,3 +326,35 @@ class FeatureEngineer:
         """
 
         return pd.merge(df_features, df_targets, on = 'date', how = 'inner')
+
+    def create_har_features(
+                self,
+                df : pd.DataFrame
+    ) -> pd.DataFrame:
+        """
+        Создать HAR-признаки для HAR моделей.
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            DataFrame с колонками date, {ticker}_RV
+
+        Returns
+        -------
+        pd.DataFrame
+            DataFrame с колонками date и HAR-признаками
+        """
+
+        df = df.copy()
+        feature_dfs = [df[['date']]]
+        tickers = [col.replace('_RV', '') for col in df.columns if col.endswith('_RV')]
+
+        for ticker in tickers:
+            ticker_rv = df[f'{ticker}_RV']
+            har_features = self._create_har_features(ticker_rv, ticker)
+            feature_dfs.append(pd.DataFrame(har_features))
+
+        result = pd.concat(feature_dfs, axis = 1)
+        result = result.dropna().reset_index(drop = True)
+
+        return result
