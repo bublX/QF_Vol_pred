@@ -15,18 +15,16 @@ def main():
     logger = Logger('TrainHAR')
     logger.info('Обучение HAR')
 
-    rv_matrix = pd.read_csv('data/processed/rv_matrix.csv')
-
+    tickers = ['VTBR', 'SBER', 'LKOH', 'ROSN', 'NVTK', 'TATN', 'GAZP', 'GMKN', 'NLMK', 'MGNT'] 
+    
+    rv_matrix = pd.read_excel('data/processed/RV_clear_V2.xlsx')
     engineer = FeatureEngineer()
-    features = engineer.create_har_features(rv_matrix)
-    targets = engineer.create_targets(rv_matrix)
+    features = engineer.create_har_features(rv_matrix, tickers)
+    targets = engineer.create_targets(rv_matrix, tickers)
 
-    df = engineer.merge_features_targets(features, targets)
+    df = pd.merge(features, targets, on = 'date', how = 'inner')
 
-    tickers = ['VTBR', 'SBER', 'LKOH', 'ROSN', 'NVTK',
-               'TATN', 'GAZP', 'GMKN', 'NLMK', 'MGNT'] 
-
-    splitter = DataSplitter(train_end = '2023-12-31',
+    splitter = DataSplitter(train_end = '2021-12-31',
                             valid_end = None)
 
     splits = splitter.split_all(df, tickers, use_validation = False)
@@ -61,7 +59,8 @@ def main():
 
     df_results = pd.DataFrame(summary)
     print(df_results.round(4))
-
+    print(df_results[['R2', 'RMSE', 'MAE', 'MSE']].mean())
+    
     Path('reports/tables').mkdir(parents = True, exist_ok = True)
     df_results.to_csv('reports/tables/har_results.csv', index = False)
     logger.success('Результаты HAR сохранены!')

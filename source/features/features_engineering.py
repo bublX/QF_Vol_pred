@@ -73,7 +73,7 @@ class FeatureEngineer:
 
         self.logger.info("Генерация признаков")
 
-        df = df.copy()
+        df = df.copy() #???
         feature_dfs = [df[['date']]]
         tickers = [col.replace('_RV', '') for col in df.columns if col.endswith('_RV')]
 
@@ -121,10 +121,10 @@ class FeatureEngineer:
         return pd.DataFrame(features)
 
     def _create_har_features(
-        self,
-        ticker_rv : pd.Series,
-        ticker : str
-    ) -> dict:
+        self, 
+        ticker_rv: pd.Series, 
+        ticker: str
+    ) -> pd.DataFrame:
         """
         Создать HAR-признаки.
         
@@ -137,15 +137,15 @@ class FeatureEngineer:
         
         Returns
         -------
-        dict
-            Словарь с признаками rv_1, rv_5, rv_22
+        pd.DataFrame
+            DataFrame с HAR-признаками
         """
 
-        return {
-            f'{ticker}_rv_1' : ticker_rv,
-            f'{ticker}_rv_5' : ticker_rv.rolling(5).mean(),
-            f'{ticker}_rv_22' : ticker_rv.rolling(22).mean()
-        }
+        return pd.DataFrame({
+            f'{ticker}_rv_1' : np.sqrt(ticker_rv.shift(1)),
+            f'{ticker}_rv_5' : np.sqrt(ticker_rv.shift(1).rolling(5).mean()),
+            f'{ticker}_rv_22': np.sqrt(ticker_rv.shift(1).rolling(22).mean()) 
+        })
 
     def _create_lag_features(
         self,
@@ -276,7 +276,8 @@ class FeatureEngineer:
 
     def create_targets(
         self, 
-        df : pd.DataFrame
+        df : pd.DataFrame,
+        tickers: list
     ) -> pd.DataFrame:
         """
         Создать целевую переменную (RV на следующий день).
@@ -292,16 +293,12 @@ class FeatureEngineer:
             DataFrame с колонками date, {ticker}_target
         """
 
-        df = df.copy()
-        tickers = [col.replace('_RV', '') for col in df.columns if col.endswith('_RV')]
+        result = df[['date']].copy()
 
-        targets = {'date' : df['date']}
         for ticker in tickers:
-            targets[f'{ticker}_target'] = np.sqrt(df[f'{ticker}_RV'].shift(-1))
+            result[f'{ticker}_target'] = np.sqrt(df[f'{ticker}_RV'])
 
-        result = pd.DataFrame(targets)
         result = result.dropna().reset_index(drop = True)
-
         return result
 
     def merge_features_targets(
@@ -329,7 +326,8 @@ class FeatureEngineer:
 
     def create_har_features(
                 self,
-                df : pd.DataFrame
+                df : pd.DataFrame,
+                tickers: list
     ) -> pd.DataFrame:
         """
         Создать HAR-признаки для HAR моделей.
@@ -344,17 +342,13 @@ class FeatureEngineer:
         pd.DataFrame
             DataFrame с колонками date и HAR-признаками
         """
-
-        df = df.copy()
-        feature_dfs = [df[['date']]]
-        tickers = [col.replace('_RV', '') for col in df.columns if col.endswith('_RV')]
+        result = df[['date']].copy()
 
         for ticker in tickers:
             ticker_rv = df[f'{ticker}_RV']
             har_features = self._create_har_features(ticker_rv, ticker)
-            feature_dfs.append(pd.DataFrame(har_features))
-
-        result = pd.concat(feature_dfs, axis = 1)
+            result = result.join(har_features)
+        
         result = result.dropna().reset_index(drop = True)
 
         return result
