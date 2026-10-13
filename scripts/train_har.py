@@ -26,7 +26,7 @@ def main():
     tickers = ['VTBR', 'SBER', 'LKOH', 'ROSN', 'NVTK',
                'TATN', 'GAZP', 'GMKN', 'NLMK', 'MGNT'] 
 
-    splitter = DataSplitter(train_end = '2023-12-31',
+    splitter = DataSplitter(train_end = '2021-12-31',
                             valid_end = None)
 
     splits = splitter.split_all(df, tickers, use_validation = False)
@@ -60,7 +60,8 @@ def main():
         })
 
     df_results = pd.DataFrame(summary)
-    print(df_results.round(4))
+    print(df_results.round(3))
+    print(df_results.drop(columns = ['Ticker']).mean().round(3))
 
     Path('reports/tables').mkdir(parents = True, exist_ok = True)
     df_results.to_csv('reports/tables/har_results.csv', index = False)

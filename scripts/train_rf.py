@@ -62,7 +62,8 @@ def main():
         })
 
     df_results = pd.DataFrame(summary)
-    print(df_results.round(4))
+    print(df_results.round(3))
+    print(df_results.drop(columns = ['Ticker']).mean().round(3))
 
     Path('reports/tables').mkdir(parents = True, exist_ok = True)
     df_results.to_csv('reports/tables/rf_results.csv', index = False)

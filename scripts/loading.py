@@ -15,12 +15,12 @@ def main():
         start_year = 2014,
         end_year = 2025,
         interval = 10,
-        delay = 0.01,
+        delay = 0.05,
         save_dir = 'data/raw/', 
         filename = 'all_prices.csv'
     )
 
-    df = loader.load_all()
+    df = loader.load_all(save_individual = True)
     print('MOEX data loaded✅')
 
 if __name__ == '__main__':
