@@ -17,7 +17,7 @@ def main():
 
     tickers = ['VTBR', 'SBER', 'LKOH', 'ROSN', 'NVTK', 'TATN', 'GAZP', 'GMKN', 'NLMK', 'MGNT'] 
     
-    rv_matrix = pd.read_excel('data/processed/RV_clear_V2.xlsx')
+    rv_matrix = pd.read_csv('data/processed/rv_matrix.csv')
     engineer = FeatureEngineer()
     features = engineer.create_har_features(rv_matrix, tickers)
     targets = engineer.create_targets(rv_matrix, tickers)
@@ -58,8 +58,8 @@ def main():
         })
 
     df_results = pd.DataFrame(summary)
-    print(df_results.round(4))
-    print(df_results[['R2', 'RMSE', 'MAE', 'MSE']].mean())
+    print(df_results.round(3))
+    print(df_results[['R2', 'RMSE', 'MAE', 'MSE']].mean().round(3))
     
     Path('reports/tables').mkdir(parents = True, exist_ok = True)
     df_results.to_csv('reports/tables/har_results.csv', index = False)

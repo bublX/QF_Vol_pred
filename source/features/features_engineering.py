@@ -142,9 +142,12 @@ class FeatureEngineer:
         """
 
         return pd.DataFrame({
-            f'{ticker}_rv_1' : np.sqrt(ticker_rv.shift(1)),
-            f'{ticker}_rv_5' : np.sqrt(ticker_rv.shift(1).rolling(5).mean()),
-            f'{ticker}_rv_22': np.sqrt(ticker_rv.shift(1).rolling(22).mean()) 
+            #f'{ticker}_rv_1' : np.sqrt(ticker_rv),
+            #f'{ticker}_rv_5' : np.sqrt(ticker_rv.rolling(5).mean()),
+            #f'{ticker}_rv_22': np.sqrt(ticker_rv.rolling(22).mean())
+            f'{ticker}_rv_1' : ticker_rv,
+            f'{ticker}_rv_5' : ticker_rv.rolling(5).mean(),
+            f'{ticker}_rv_22': ticker_rv.rolling(22).mean()
         })
 
     def _create_lag_features(
@@ -203,7 +206,7 @@ class FeatureEngineer:
         features[f'{ticker}_momentum'] = ticker_rv / ticker_rv.rolling(window = self.momentum_window).mean().replace(0, np.nan)
 
         for day in self.vol_ratio_windows:
-            features[f'{ticker}_vol_ratio_{day}'] = ticker_rv / ticker_rv.rolling(day).mean()
+            features[f'{ticker}_vol_ratio_{day}'] = ticker_rv/ ticker_rv.rolling(day).mean()
 
         return features
 
@@ -296,7 +299,8 @@ class FeatureEngineer:
         result = df[['date']].copy()
 
         for ticker in tickers:
-            result[f'{ticker}_target'] = np.sqrt(df[f'{ticker}_RV'])
+            #result[f'{ticker}_target'] = np.sqrt(df[f'{ticker}_RV'].shift(-1))
+            result[f'{ticker}_target'] = df[f'{ticker}_RV'].shift(-1)
 
         result = result.dropna().reset_index(drop = True)
         return result

@@ -7,15 +7,14 @@ from source.data_processors.data_loader import DataLoader
 
 def main():
 
-    tickers = ['VTBR', 'SBER', 'LKOH', 'ROSN', 'NVTK',
-               'TATN', 'GAZP', 'GMKN', 'NLMK', 'MGNT']
+    tickers = ['VTBR', 'SBER', 'LKOH', 'ROSN', 'NVTK','TATN', 'GAZP', 'GMKN', 'NLMK', 'MGNT']
 
     loader = DataLoader(
         tickers = tickers,
         start_year = 2014,
-        end_year = 2025,
+        end_year = 2024,
         interval = 10,
-        delay = 0.01,
+        delay = 0,
         save_dir = 'data/raw/', 
         filename = 'all_prices.csv'
     )
