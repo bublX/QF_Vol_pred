@@ -21,8 +21,8 @@ class DataSplitter:
     """
     def __init__(
         self,
-        train_end : str = '2023-12-31',
-        valid_end : Optional[str] = '2023-12-31',
+        train_end : str = '2021-12-31',
+        valid_end : Optional[str] = '2023-12-31'
     ):
         self.train_end = train_end
         self.valid_end = valid_end
@@ -75,7 +75,6 @@ class DataSplitter:
         if use_validation and self.valid_end:
             X_valid = df.loc[validation_mask, feature_cols]
             y_valid = df.loc[validation_mask, target_col]
-
         else:
             X_valid = None
             y_valid = None

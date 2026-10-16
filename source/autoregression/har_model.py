@@ -39,8 +39,8 @@ class HARModel(BaseARModel):
         self._validate_input(X)
         self._features_names = X.columns.to_list()
 
-        X_constant = sm.add_constant(X)
-        self.model = sm.OLS(y, X_constant).fit()
+        X = sm.add_constant(X)
+        self.model = sm.OLS(y, X).fit()
 
         self._intercept = self.model.params.iloc[0]
         self._coef = self.model.params.iloc[1:].values
@@ -71,8 +71,8 @@ class HARModel(BaseARModel):
         self._check_is_trained()
         self._validate_input(X)
 
-        X_constant = sm.add_constant(X)
-        return self.model.predict(X_constant).values
+        X = sm.add_constant(X)
+        return self.model.predict(X).values
 
     def get_params(self) -> Dict:
         """

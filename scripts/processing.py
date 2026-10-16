@@ -9,7 +9,7 @@ def main():
     processor = DataProcessor(  
         input_dir = 'data/raw/',
         output_dir = 'data/processed/',
-        fat_finger_type = 'standart',
+        fat_finger_type = None,
         use_rv_filter = False,
         max_return = 5
     )

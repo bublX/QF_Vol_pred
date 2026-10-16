@@ -16,15 +16,13 @@ def main():
     logger.info('Обучение Random Forest')
 
     rv_matrix = pd.read_csv('data/processed/rv_matrix.csv')
-
+    tickers = ['VTBR', 'SBER', 'LKOH', 'ROSN', 'NVTK', 'TATN', 'GAZP', 'GMKN', 'NLMK', 'MGNT']
+    
     engineer = FeatureEngineer()
     features = engineer.create_features(rv_matrix)
-    targets = engineer.create_targets(rv_matrix)
+    targets = engineer.create_targets(rv_matrix, tickers)
 
     df = engineer.merge_features_targets(features, targets)
-
-    tickers = ['VTBR', 'SBER', 'LKOH', 'ROSN', 'NVTK',
-               'TATN', 'GAZP', 'GMKN', 'NLMK', 'MGNT']
 
     splitter = DataSplitter(train_end = '2021-12-31', 
                             valid_end = None)
@@ -63,7 +61,7 @@ def main():
 
     df_results = pd.DataFrame(summary)
     print(df_results.round(3))
-    print(df_results.drop(columns = ['Ticker']).mean().round(3))
+    print(df_results[['R2', 'RMSE', 'MAE', 'MSE']].mean().round(3))
 
     Path('reports/tables').mkdir(parents = True, exist_ok = True)
     df_results.to_csv('reports/tables/rf_results.csv', index = False)
