@@ -1,14 +1,84 @@
 import argparse
+import sys
 from pathlib import Path
 
 import pandas as pd
 
 from source.config import Config, load_config
+from source.data_processors.data_loader import DataLoader
+from source.data_processors.data_processor import DataProcessor
 from source.features.data_splitter import DataSplitter
 from source.features.features_engineering import FeatureEngineer
 from source.models.registry import get_model
 from source.utils.logger import Logger
 from source.utils.metrics import MetricsCalculator
+
+COMMAND = "uv run python -m source.run --config <конфиг>"
+
+
+def load(config: Config) -> None:
+    """
+    Загрузить цены с MOEX и сохранить в {data.raw_dir}/{data.raw_file}.
+
+    Parameters
+    ----------
+    config : Config
+        Конфиг эксперимента
+
+    Notes
+    -----
+    Делает сетевые запросы к MOEX ISS API, может занять много времени.
+    """
+
+    data_cfg = config.data
+    loader = DataLoader(
+        tickers=data_cfg.tickers,
+        start_year=data_cfg.start_year,
+        end_year=data_cfg.end_year,
+        interval=data_cfg.interval,
+        delay=data_cfg.delay,
+        save_dir=data_cfg.raw_dir,
+        filename=data_cfg.raw_file,
+        base_url=data_cfg.base_url,
+    )
+    loader.load_all()
+
+
+def process(config: Config) -> None:
+    """
+    Очистить сырые цены и рассчитать RV, результат в {processing.processed_dir}.
+
+    Parameters
+    ----------
+    config : Config
+        Конфиг эксперимента
+
+    Raises
+    ------
+    FileNotFoundError
+        Если нет файла с сырыми ценами
+    """
+
+    raw_path = Path(config.data.raw_dir) / config.data.raw_file
+    if not raw_path.exists():
+        raise FileNotFoundError(
+            f"Нет сырых данных: {raw_path}. Сначала загрузите их: {COMMAND} --stage load"
+        )
+
+    proc_cfg = config.processing
+    processor = DataProcessor(
+        input_dir=config.data.raw_dir,
+        output_dir=proc_cfg.processed_dir,
+        min_bars_per_day=proc_cfg.min_bars_per_day,
+        fat_finger_window=proc_cfg.fat_finger_window,
+        fat_finger_threshold=proc_cfg.fat_finger_threshold,
+        max_return=proc_cfg.max_return,
+        fat_finger_type=proc_cfg.fat_finger_type,
+        fat_finger_sigma=proc_cfg.fat_finger_sigma,
+        hampel_const=proc_cfg.hampel_const,
+        use_rv_filter=proc_cfg.use_rv_filter,
+    )
+    processor.process_all(config.data.raw_file)
 
 
 def run(config: Config) -> pd.DataFrame:
@@ -29,14 +99,29 @@ def run(config: Config) -> pd.DataFrame:
     -----
     Результаты сохраняются в {output.reports_dir}/{output.name}_results.csv,
     если output.name не задан, используется model.name.
+
+    Raises
+    ------
+    FileNotFoundError
+        Если нет {processing.processed_dir}/rv_matrix.csv
     """
+
+    rv_path = Path(config.processing.processed_dir) / "rv_matrix.csv"
+    if not rv_path.exists():
+        raw_path = Path(config.data.raw_dir) / config.data.raw_file
+        hint = f"{COMMAND} --stage process"
+        if not raw_path.exists():
+            hint = f"{COMMAND} --stage load, затем {hint}"
+        raise FileNotFoundError(
+            f"Нет обработанных данных: {rv_path}. Сначала выполните: {hint}"
+        )
 
     name = config.output.name or config.model.name
     logger = Logger(f"Train{name.upper()}")
     logger.info(f"Обучение {config.model.name}")
 
     tickers = config.data.tickers
-    rv_matrix = pd.read_csv(Path(config.processing.processed_dir) / "rv_matrix.csv")
+    rv_matrix = pd.read_csv(rv_path)
 
     features_cfg = config.features
     engineer = FeatureEngineer(
@@ -103,16 +188,31 @@ def run(config: Config) -> pd.DataFrame:
 
 def main() -> None:
     """
-    Точка входа: uv run python -m source.run --config configs/<name>.yaml
+    Точка входа: uv run python -m source.run --config configs/<name>.yaml [--stage ...]
+
+    Этапы: load — загрузка с MOEX, process — расчёт RV, train — обучение (по умолчанию).
     """
 
-    parser = argparse.ArgumentParser(description="Обучение модели по YAML-конфигу")
+    parser = argparse.ArgumentParser(
+        description="Пайплайн прогнозирования RV по YAML-конфигу"
+    )
     parser.add_argument(
         "--config", required=True, help="Путь к YAML-конфигу эксперимента"
     )
+    parser.add_argument(
+        "--stage",
+        choices=["load", "process", "train"],
+        default="train",
+        help="Этап пайплайна (по умолчанию train)",
+    )
     args = parser.parse_args()
 
-    run(load_config(args.config))
+    config = load_config(args.config)
+    stages = {"load": load, "process": process, "train": run}
+    try:
+        stages[args.stage](config)
+    except FileNotFoundError as error:
+        sys.exit(f"Ошибка: {error}")
 
 
 if __name__ == "__main__":

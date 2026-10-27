@@ -34,18 +34,21 @@ uv run ruff format .    # форматирование
 
 ### Запуск
 
+Все команды запускаются из корня проекта (пути в конфигах относительные).
+
 ```bash
-uv run python scripts/loading.py      # загрузка цен с MOEX (сеть, долго) -> data/raw/
-uv run python scripts/processing.py   # очистка и расчёт RV -> data/processed/
-uv run python -m source.run --config configs/har.yaml   # обучение -> reports/tables/har_results.csv
+uv run python -m source.run --config configs/har.yaml --stage load     # загрузка цен с MOEX (сеть, долго) -> data/raw/
+uv run python -m source.run --config configs/har.yaml --stage process  # очистка и расчёт RV -> data/processed/
+uv run python -m source.run --config configs/har.yaml                  # обучение (stage train) -> reports/tables/har_results.csv
 ```
+
+Этапы `load` и `process` нужно выполнить один раз; дальше можно обучать любые модели.
+Если данных не хватает, команда подскажет, какой этап запустить.
 
 Готовые эксперименты: `configs/har.yaml`, `rf.yaml`, `xgb.yaml`, `lgbm.yaml`.
 Все значения по умолчанию лежат в `configs/default.yaml`; файл эксперимента
 переопределяет только то, что отличается. Новый эксперимент — новый YAML-файл в `configs/`.
 Новая модель — класс в `source/models/` и строка в `MODELS` в `source/models/registry.py`.
-
-Скрипты `scripts/train_*.py` пока оставлены для сверки и будут удалены.
 
 ## Структура проекта
 
@@ -58,7 +61,7 @@ QF_Vol_pred/
 │
 ├── source/                          # Главная папка с исходным кодом
 │   ├── config.py                    # Загрузка и проверка конфигов
-│   ├── run.py                       # Точка входа: обучение по конфигу
+│   ├── run.py                       # Точка входа: этапы load / process / train
 │   │
 │   ├── data_processors/             # Обработка данных
 │   │   ├── data_loader.py           # Загрузка данных с MOEX ISS API
@@ -82,12 +85,6 @@ QF_Vol_pred/
 │   └── utils/                       # Вспомогательные утилиты
 │       ├── logger.py                # Единый логгер
 │       └── metrics.py               # Метрики (MSE, RMSE, MAE, R2)
-│
-├── scripts/                         # Скрипты для запуска
-│   ├── loading.py                   # Запуск загрузки данных
-│   ├── processing.py                # Запуск обработки
-│   ├── train_*.py                   # Старые скрипты обучения (заменены source/run.py)
-│   └── run_pipeline.py              # Полный пайплайн
 │
 ├── tests/                           # Тесты (uv run pytest)
 │

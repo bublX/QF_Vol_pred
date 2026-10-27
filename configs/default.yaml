@@ -18,7 +18,7 @@ processing:
   fat_finger_window: 11
   fat_finger_threshold: 0.03
   max_return: 5
-  fat_finger_type: null  # как в scripts/processing.py; DataProcessor не принимает None
+  fat_finger_type: standart  # standart | hampel
   fat_finger_sigma: 3.0
   hampel_const: 1.4826
   use_rv_filter: false

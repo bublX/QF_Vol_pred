@@ -3,7 +3,7 @@ import pandas as pd
 import pytest
 
 from source.config import load_config
-from source.run import run
+from source.run import load, process, run
 
 
 @pytest.fixture
@@ -52,3 +52,75 @@ def test_run_saves_results(config_path, tmp_path, model_yaml, file_name):
     assert np.allclose(
         saved[["R2", "RMSE", "MAE", "MSE"]], df[["R2", "RMSE", "MAE", "MSE"]]
     )
+
+
+def _write_experiment(tmp_path, extra=""):
+    path = tmp_path / "exp.yaml"
+    path.write_text(
+        f"""
+model: {{name: rf}}
+data: {{tickers: [AAA, BBB], raw_dir: {tmp_path / "raw"}}}
+processing: {{processed_dir: {tmp_path / "processed"}}}
+{extra}
+""",
+        encoding="utf-8",
+    )
+    return load_config(path)
+
+
+def test_process_creates_rv_matrix(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    rng = np.random.default_rng(0)
+    days = pd.bdate_range("2024-01-01", periods=5)
+    times = [
+        day + pd.Timedelta(minutes=600 + 10 * i) for day in days for i in range(53)
+    ]
+    raw = pd.DataFrame({"date": times})
+    for ticker in ["AAA", "BBB"]:
+        raw[f"{ticker}_close"] = 100 * np.exp(
+            np.cumsum(rng.normal(0, 0.001, len(times)))
+        )
+    (tmp_path / "raw").mkdir()
+    raw.to_csv(tmp_path / "raw" / "all_prices.csv", index=False)
+
+    process(_write_experiment(tmp_path))
+
+    rv_matrix = pd.read_csv(tmp_path / "processed" / "rv_matrix.csv")
+    assert list(rv_matrix.columns) == ["date", "AAA_RV", "BBB_RV"]
+    assert len(rv_matrix) == 5
+
+
+def test_process_without_raw_data_suggests_load(tmp_path):
+    with pytest.raises(FileNotFoundError, match="--stage load"):
+        process(_write_experiment(tmp_path))
+
+
+def test_train_without_any_data_suggests_load_and_process(tmp_path):
+    with pytest.raises(
+        FileNotFoundError, match="--stage load, затем .*--stage process"
+    ):
+        run(_write_experiment(tmp_path))
+
+
+def test_train_without_processed_data_suggests_process(tmp_path):
+    (tmp_path / "raw").mkdir()
+    (tmp_path / "raw" / "all_prices.csv").write_text("date\n")
+    with pytest.raises(FileNotFoundError) as error:
+        run(_write_experiment(tmp_path))
+    assert "--stage process" in str(error.value)
+    assert "--stage load" not in str(error.value)
+
+
+def test_load_passes_config_to_data_loader(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    captured = {}
+    monkeypatch.setattr(
+        "source.run.DataLoader.load_all", lambda self: captured.update(vars(self))
+    )
+
+    load(_write_experiment(tmp_path))
+
+    assert captured["tickers"] == ["AAA", "BBB"]
+    assert captured["start_year"] == 2014
+    assert captured["end_year"] == 2024
+    assert captured["save_path"] == tmp_path / "raw" / "all_prices.csv"

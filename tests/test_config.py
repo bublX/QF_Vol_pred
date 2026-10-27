@@ -87,13 +87,14 @@ def test_features_defaults_match_feature_engineer(tmp_path):
 
 
 def test_processing_defaults_match_data_processor(tmp_path):
-    # max_return и fat_finger_type взяты из scripts/processing.py, а не из класса
+    # max_return = 5 (значение из бывшего scripts/processing.py), а не 15.0 из класса
     config = load_config(write(tmp_path, "model: {name: rf}\n"))
     defaults = _defaults(DataProcessor)
     for name in [
         "min_bars_per_day",
         "fat_finger_window",
         "fat_finger_threshold",
+        "fat_finger_type",
         "fat_finger_sigma",
         "hampel_const",
         "use_rv_filter",
