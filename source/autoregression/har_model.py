@@ -4,25 +4,20 @@ import statsmodels.api as sm
 from typing import Dict, List
 from source.autoregression.base_ar import BaseARModel
 
+
 class HARModel(BaseARModel):
     """
     HAR-модель для прогнозирования RV. Наследует BaseARModel.
-    
+
     Реализует fit/predict для HAR.
     """
-    def __init__(
-        self,
-        lags : List[int] = [1, 5, 22]
-    ):
-        super().__init__('HAR', lags)
+
+    def __init__(self, lags: List[int] = [1, 5, 22]):
+        super().__init__("HAR", lags)
         self._coef = None
         self._intercept = None
 
-    def fit(
-        self,
-        X : pd.DataFrame,
-        y : pd.Series
-    ) -> 'HARModel':
+    def fit(self, X: pd.DataFrame, y: pd.Series) -> "HARModel":
         """
         Обучение HAR через OLS.
 
@@ -33,7 +28,7 @@ class HARModel(BaseARModel):
 
         Notes
         -----
-        См. class BaseARModel.fit. 
+        См. class BaseARModel.fit.
         """
 
         self._validate_input(X)
@@ -46,18 +41,14 @@ class HARModel(BaseARModel):
         self._coef = self.model.params.iloc[1:].values
 
         self.is_trained = True
-        self.logger.success(f'HAR обучен!')
+        self.logger.success(f"HAR обучен!")
 
         return self
 
-    def predict(
-        self,
-        X : pd.DataFrame
-    ) -> np.ndarray:
-
+    def predict(self, X: pd.DataFrame) -> np.ndarray:
         """
         Сделать прогноз.
-        
+
         Returns
         -------
         np.ndarray
@@ -86,9 +77,7 @@ class HARModel(BaseARModel):
 
         params = super().get_params()
         if self.is_trained:
-            params['intercept'] = float(self._intercept)
-            params['coef'] = self._coef.to_list()
+            params["intercept"] = float(self._intercept)
+            params["coef"] = self._coef.to_list()
 
         return params
-
-    

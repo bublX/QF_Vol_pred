@@ -7,12 +7,13 @@ from lightgbm import LGBMRegressor, early_stopping, log_evaluation
 from source.models.base import BaseModel
 from contextlib import redirect_stdout
 
+
 class LightGBMModel(BaseModel):
     """
     LightGBM для прогнозирования RV.
-    
+
     Наследует BaseModel. Реализует fit/predict для LGBMRegressor.
-    
+
     Parameters
     ----------
     n_estimators : int
@@ -33,54 +34,55 @@ class LightGBMModel(BaseModel):
         Частота подвыборки
     random_state : int
         Seed для воспроизводимости
-    verbose : bool 
+    verbose : bool
         Индикатор для вывода логирования обучения
     Notes
     -----
     Если eval_set не передан — early stopping отключается.
     Вывод early stopping подавляется через sys.stdout.
     """
+
     def __init__(
         self,
-        n_estimators : int = 1000,
-        max_depth : int = 31,
-        learning_rate : float = 0.05,
-        min_child_samples : int = 20,
-        reg_alpha : float = 0.1,
-        reg_lambda : float = 1,
-        subsample : float = 0.8, 
-        subsample_freq : int = 5,
-        random_state : int = 42, 
-        verbose : bool = False,
-        **kwargs
+        n_estimators: int = 1000,
+        max_depth: int = 31,
+        learning_rate: float = 0.05,
+        min_child_samples: int = 20,
+        reg_alpha: float = 0.1,
+        reg_lambda: float = 1,
+        subsample: float = 0.8,
+        subsample_freq: int = 5,
+        random_state: int = 42,
+        verbose: bool = False,
+        **kwargs,
     ):
-        super().__init__('LightGBM')
+        super().__init__("LightGBM")
         self.verbose = verbose
         self.model = LGBMRegressor(
-            n_estimators = n_estimators,
-            max_depth = max_depth,
-            learning_rate = learning_rate,
-            min_child_samples = min_child_samples,
-            reg_alpha = reg_alpha,
-            reg_lambda = reg_lambda,
-            subsample = subsample, 
-            subsample_freq = subsample_freq,
-            random_state = random_state,
-            verbosity = -1,
-            n_jobs = -1,
-            **kwargs
+            n_estimators=n_estimators,
+            max_depth=max_depth,
+            learning_rate=learning_rate,
+            min_child_samples=min_child_samples,
+            reg_alpha=reg_alpha,
+            reg_lambda=reg_lambda,
+            subsample=subsample,
+            subsample_freq=subsample_freq,
+            random_state=random_state,
+            verbosity=-1,
+            n_jobs=-1,
+            **kwargs,
         )
 
     def fit(
         self,
-        X : pd.DataFrame,
-        y : pd.Series,
-        eval_set : List[Tuple[pd.DataFrame, pd.Series]] = None,
-        early_stopping_rounds : int = 50
-    ) -> 'LightGBMModel':
+        X: pd.DataFrame,
+        y: pd.Series,
+        eval_set: List[Tuple[pd.DataFrame, pd.Series]] = None,
+        early_stopping_rounds: int = 50,
+    ) -> "LightGBMModel":
         """
         Обучить модель.
-        
+
         Parameters
         ----------
         X : pd.DataFrame
@@ -91,7 +93,7 @@ class LightGBMModel(BaseModel):
             Валидационная выборка для early stopping
         early_stopping_rounds : int
             Раундов без улучшения до остановки
-        
+
         Notes
         -----
         Если eval_set не передан — early stopping отключается.
@@ -106,12 +108,17 @@ class LightGBMModel(BaseModel):
             X_valid, y_valid = eval_set[0]
             eval_X = [X_valid.values]
             eval_y = y_valid.values
-            callbacks = [early_stopping(early_stopping_rounds), log_evaluation(period = -1)]
+            callbacks = [
+                early_stopping(early_stopping_rounds),
+                log_evaluation(period=-1),
+            ]
             if self.verbose:
-                self.model.fit(X, y, eval_X = eval_X, eval_y = eval_y, callbacks = callbacks)
+                self.model.fit(X, y, eval_X=eval_X, eval_y=eval_y, callbacks=callbacks)
             else:
-                with open(os.devnull, 'w') as f, redirect_stdout(f):
-                    self.model.fit(X, y, eval_X = eval_X, eval_y = eval_y, callbacks = callbacks)
+                with open(os.devnull, "w") as f, redirect_stdout(f):
+                    self.model.fit(
+                        X, y, eval_X=eval_X, eval_y=eval_y, callbacks=callbacks
+                    )
         else:
             self.model.fit(X, y)
 
@@ -119,13 +126,10 @@ class LightGBMModel(BaseModel):
 
         return self
 
-    def predict(
-        self,
-        X : pd.DataFrame
-    ) -> np.ndarray:
+    def predict(self, X: pd.DataFrame) -> np.ndarray:
         """
         Сделать прогноз.
-        
+
         Notes
         -----
         См. BaseModel.predict.
@@ -139,12 +143,12 @@ class LightGBMModel(BaseModel):
     def features_importance(self) -> dict:
         """
         Вернуть важность признаков.
-        
+
         Returns
         -------
         dict
             {признак: важность}
-        
+
         Raises
         ------
         ValueError
@@ -154,6 +158,6 @@ class LightGBMModel(BaseModel):
         self._check_is_trained()
 
         if self._feature_names is None:
-            raise ValueError('No features names')
+            raise ValueError("No features names")
         else:
             return dict(zip(self._feature_names, self.model.feature_importances_))

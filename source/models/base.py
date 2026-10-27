@@ -4,6 +4,7 @@ from abc import ABC, abstractmethod
 from typing import Optional, List
 from source.utils.logger import Logger
 
+
 class BaseModel(ABC):
     """
     Базовый абстрактный класс для моделей машинного обучения
@@ -21,12 +22,10 @@ class BaseModel(ABC):
         Внутренняя модель (xgboost, lightgbm и тд)
     is_trained : bool
         Индикатор обученности модели
-    _feature_names  
+    _feature_names
     """
-    def __init__(
-        self,
-        name : str
-    ):
+
+    def __init__(self, name: str):
         self.name = name
         self.model = None
         self.is_trained = False
@@ -34,21 +33,17 @@ class BaseModel(ABC):
         self.logger = Logger(name)
 
     @abstractmethod
-    def fit(
-        self, 
-        X : pd.DataFrame,
-        y : pd.Series
-    ) -> 'BaseModel':
+    def fit(self, X: pd.DataFrame, y: pd.Series) -> "BaseModel":
         """
         Обучить модель.
-        
+
         Parameters
         ----------
         X : pd.DataFrame
             Признаки
         y : pd.Series
             Целевая переменная
-        
+
         Returns
         -------
         BaseModel
@@ -58,18 +53,15 @@ class BaseModel(ABC):
         pass
 
     @abstractmethod
-    def predict(
-        self,
-        X : pd.DataFrame
-    ) -> np.ndarray:
+    def predict(self, X: pd.DataFrame) -> np.ndarray:
         """
         Сделать прогноз.
-        
+
         Parameters
         ----------
         X : pd.DataFrame
             Признаки
-        
+
         Returns
         -------
         np.ndarray
@@ -81,7 +73,7 @@ class BaseModel(ABC):
     def get_params(self) -> dict:
         """
         Вернуть параметры модели.
-        
+
         Returns
         -------
         Dict
@@ -90,13 +82,13 @@ class BaseModel(ABC):
 
         if self.model is None:
             return {}
-        
+
         return self.model.get_params()
 
     def get_feature_names(self) -> Optional[List]:
         """
         Вернуть имена признаков.
-        
+
         Returns
         -------
         Optional[List]
@@ -104,18 +96,15 @@ class BaseModel(ABC):
         """
         return self._feature_names
 
-    def _validate_input(
-        self, 
-        X : pd.DataFrame
-    ) -> None:
+    def _validate_input(self, X: pd.DataFrame) -> None:
         """
         Проверить входные данные.
-        
+
         Parameters
         ----------
         X : pd.DataFrame
             Признаки
-        
+
         Raises
         ------
         TypeError
@@ -126,16 +115,16 @@ class BaseModel(ABC):
 
         if not isinstance(X, pd.DataFrame):
             self.logger.error(f"Ожидается DataFrame, получено {type(X)}")
-            raise TypeError(f'Ожидается DataFrame, получено {type(X)}!')
-        
+            raise TypeError(f"Ожидается DataFrame, получено {type(X)}!")
+
         if X.empty:
             self.logger.error("Признаки пустые!")
-            raise ValueError('Признаки пустые!')
+            raise ValueError("Признаки пустые!")
 
     def _check_is_trained(self) -> None:
         """
         Проверить, что модель обучена.
-        
+
         Raises
         ------
         ValueError
@@ -143,16 +132,16 @@ class BaseModel(ABC):
         """
         if not self.is_trained:
             self.logger.error(f"Модель {self.name} не обучена")
-            raise ValueError(f'Модель {self.name} не обучена. Вызовите fit().')
-        
+            raise ValueError(f"Модель {self.name} не обучена. Вызовите fit().")
+
     def __repr__(self) -> str:
         """
         Строковое представление модели.
-        
+
         Returns
         -------
         str
             Например: 'RandomForestModel : (name = RandomForest, status = trained)'
         """
-        status = 'trained' if self.is_trained else 'not trained'
-        return f'{self.__class__.__name__} : (name = {self.name}, status = {status})'
+        status = "trained" if self.is_trained else "not trained"
+        return f"{self.__class__.__name__} : (name = {self.name}, status = {status})"

@@ -3,6 +3,7 @@ import sys
 from pathlib import Path
 from typing import Optional
 
+
 class Logger:
     """
     Единый логгер для проекта.
@@ -20,10 +21,7 @@ class Logger:
     _loggers = {}
 
     def __new__(
-        cls,
-        name : str,
-        log_file : Optional[str] = None,
-        level : int = logging.INFO
+        cls, name: str, log_file: Optional[str] = None, level: int = logging.INFO
     ):
         if name in cls._loggers:
             return cls._loggers[name]
@@ -32,12 +30,9 @@ class Logger:
         return instance
 
     def __init__(
-        self,
-        name : str,
-        log_file : Optional[str] = None,
-        level : int = logging.INFO
+        self, name: str, log_file: Optional[str] = None, level: int = logging.INFO
     ):
-        if hasattr(self, '_initialized'):
+        if hasattr(self, "_initialized"):
             return
         self._initizialized = True
 
@@ -45,8 +40,8 @@ class Logger:
         self.logger.setLevel(level)
 
         formatter = logging.Formatter(
-            '%(asctime)s | %(name)-15s | %(levelname)-8s | %(message)s',
-            datefmt = '%H:%M:%S'
+            "%(asctime)s | %(name)-15s | %(levelname)-8s | %(message)s",
+            datefmt="%H:%M:%S",
         )
 
         if not self.logger.handlers:
@@ -55,15 +50,15 @@ class Logger:
             self.logger.addHandler(console)
 
             if log_file is None:
-                log_file = f'reports/logs/{name.lower()}.log'
+                log_file = f"reports/logs/{name.lower()}.log"
 
             path = Path(log_file)
-            path.parent.mkdir(parents = True, exist_ok = True)
-            file_handler = logging.FileHandler(path, encoding = 'utf-8')
+            path.parent.mkdir(parents=True, exist_ok=True)
+            file_handler = logging.FileHandler(path, encoding="utf-8")
             file_handler.setFormatter(formatter)
             self.logger.addHandler(file_handler)
 
-    def info(self, msg : str):
+    def info(self, msg: str):
         """
         Обычное сообщение
         Parameters
@@ -84,11 +79,11 @@ class Logger:
         """
 
         self.logger.info(f" {msg}")
-    
+
     def warning(self, msg: str):
         """
         Предупреждение.
-        
+
         Parameters
         ----------
         msg : str
@@ -96,7 +91,7 @@ class Logger:
         """
 
         self.logger.warning(f" {msg}")
-    
+
     def error(self, msg: str):
         """
         Ошибка.
@@ -108,7 +103,7 @@ class Logger:
         """
 
         self.logger.error(f" {msg}")
-    
+
     def debug(self, msg: str):
         """
         Отладочное сообщение.
@@ -120,10 +115,8 @@ class Logger:
         """
 
         self.logger.debug(f" {msg}")
-    
-    def step(self, 
-             step: str, 
-             msg: str):
+
+    def step(self, step: str, msg: str):
         """
         Шаг обработки.
 
@@ -136,5 +129,3 @@ class Logger:
         """
 
         self.logger.info(f" [{step}] {msg}")
-
-        

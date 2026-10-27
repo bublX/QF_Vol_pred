@@ -6,9 +6,11 @@ from typing import Any, Union
 
 import yaml
 
-DEFAULT_CONFIG_PATH = Path(__file__).resolve().parent.parent / 'configs' / 'default.yaml'
+DEFAULT_CONFIG_PATH = (
+    Path(__file__).resolve().parent.parent / "configs" / "default.yaml"
+)
 
-AVAILABLE_METRICS = ['mse', 'rmse', 'mae', 'r2']
+AVAILABLE_METRICS = ["mse", "rmse", "mae", "r2"]
 
 
 @dataclass
@@ -16,6 +18,7 @@ class DataConfig:
     """
     Параметры загрузки данных с MOEX (см. DataLoader).
     """
+
     tickers: list[str]
     start_year: int
     end_year: int
@@ -31,6 +34,7 @@ class ProcessingConfig:
     """
     Параметры очистки данных и расчёта RV (см. DataProcessor).
     """
+
     min_bars_per_day: int
     fat_finger_window: int
     fat_finger_threshold: float
@@ -47,6 +51,7 @@ class FeaturesConfig:
     """
     Параметры генерации признаков (см. FeatureEngineer).
     """
+
     num_lags: list[int]
     windows: list[int]
     ma_windows: list[int]
@@ -60,6 +65,7 @@ class SplitConfig:
     """
     Параметры разбиения на выборки (см. DataSplitter).
     """
+
     train_end: str
     valid_end: str | None
     use_validation: bool
@@ -70,6 +76,7 @@ class ModelConfig:
     """
     Название модели и её гиперпараметры.
     """
+
     name: str | None
     params: dict[str, Any]
 
@@ -79,6 +86,7 @@ class EvaluationConfig:
     """
     Список метрик для оценки прогнозов.
     """
+
     metrics: list[str]
 
 
@@ -87,6 +95,7 @@ class OutputConfig:
     """
     Куда сохранять результаты.
     """
+
     reports_dir: str
     name: str | None
 
@@ -96,6 +105,7 @@ class Config:
     """
     Полный конфиг эксперимента.
     """
+
     data: DataConfig
     processing: ProcessingConfig
     features: FeaturesConfig
@@ -106,8 +116,7 @@ class Config:
 
 
 def load_config(
-        path: str | Path,
-        default_path: str | Path = DEFAULT_CONFIG_PATH
+    path: str | Path, default_path: str | Path = DEFAULT_CONFIG_PATH
 ) -> Config:
     """
     Загрузить конфиг эксперимента поверх конфига по умолчанию.
@@ -140,15 +149,19 @@ def load_config(
     """
 
     values = _deep_merge(_read_yaml(Path(default_path)), _read_yaml(Path(path)))
-    config = _build(Config, values, '')
+    config = _build(Config, values, "")
 
     if config.model.name is None:
         raise ValueError("'model.name' не задан: укажите модель в файле эксперимента")
 
-    unknown_metrics = [m for m in config.evaluation.metrics if m not in AVAILABLE_METRICS]
+    unknown_metrics = [
+        m for m in config.evaluation.metrics if m not in AVAILABLE_METRICS
+    ]
     if unknown_metrics:
-        raise ValueError(f"Неизвестные метрики в 'evaluation.metrics': {unknown_metrics}. "
-                         f'Доступные: {AVAILABLE_METRICS}')
+        raise ValueError(
+            f"Неизвестные метрики в 'evaluation.metrics': {unknown_metrics}. "
+            f"Доступные: {AVAILABLE_METRICS}"
+        )
 
     return config
 
@@ -159,23 +172,22 @@ def _read_yaml(path: Path) -> dict:
     """
 
     if not path.exists():
-        raise FileNotFoundError(f'Файл конфига не найден: {path}')
+        raise FileNotFoundError(f"Файл конфига не найден: {path}")
 
-    with open(path, encoding='utf-8') as f:
+    with open(path, encoding="utf-8") as f:
         values = yaml.safe_load(f)
 
     if values is None:
         return {}
     if not isinstance(values, dict):
-        raise TypeError(f'Конфиг {path} должен быть словарём, получено {type(values).__name__}')
+        raise TypeError(
+            f"Конфиг {path} должен быть словарём, получено {type(values).__name__}"
+        )
 
     return values
 
 
-def _deep_merge(
-        base: dict,
-        override: dict
-) -> dict:
+def _deep_merge(base: dict, override: dict) -> dict:
     """
     Рекурсивно объединить словари: значения из override имеют приоритет.
     """
@@ -190,11 +202,7 @@ def _deep_merge(
     return result
 
 
-def _build(
-        cls: type,
-        values: Any,
-        section: str
-) -> Any:
+def _build(cls: type, values: Any, section: str) -> Any:
     """
     Создать dataclass из словаря, проверив ключи и типы.
 
@@ -208,40 +216,41 @@ def _build(
         Путь к секции для сообщений об ошибках ('' для корня)
     """
 
-    where = f"'{section}'" if section else 'корне конфига'
+    where = f"'{section}'" if section else "корне конфига"
     if not isinstance(values, dict):
-        raise TypeError(f'В {where} ожидается словарь, получено {type(values).__name__}')
+        raise TypeError(
+            f"В {where} ожидается словарь, получено {type(values).__name__}"
+        )
 
     hints = typing.get_type_hints(cls)
     names = [f.name for f in fields(cls)]
 
     unknown = sorted(set(values) - set(names))
     if unknown:
-        raise ValueError(f'Неизвестные ключи в {where}: {unknown}. Допустимые: {names}')
+        raise ValueError(f"Неизвестные ключи в {where}: {unknown}. Допустимые: {names}")
 
     missing = [name for name in names if name not in values]
     if missing:
-        raise ValueError(f'Пропущены ключи в {where}: {missing}')
+        raise ValueError(f"Пропущены ключи в {where}: {missing}")
 
     kwargs = {}
     for name in names:
-        key = f'{section}.{name}' if section else name
+        key = f"{section}.{name}" if section else name
         tp = hints[name]
         if is_dataclass(tp):
             kwargs[name] = _build(tp, values[name], key)
         else:
             if not _matches(values[name], tp):
-                raise ValueError(f"'{key}': ожидается {_type_name(tp)}, "
-                                 f'получено {values[name]!r} ({type(values[name]).__name__})')
+                raise ValueError(
+                    f"'{key}': ожидается {_type_name(tp)}, "
+                    f"получено {values[name]!r} ({type(values[name]).__name__})"
+                )
             kwargs[name] = values[name]
 
     return cls(**kwargs)
 
 
-def _matches(
-        value: Any,
-        tp: Any
-) -> bool:
+def _matches(value: Any, tp: Any) -> bool:
     """
     Проверить, что значение соответствует аннотации типа.
 
@@ -277,4 +286,4 @@ def _type_name(tp: Any) -> str:
 
     if typing.get_origin(tp) is None:
         return tp.__name__
-    return str(tp).replace('typing.', '')
+    return str(tp).replace("typing.", "")

@@ -4,8 +4,8 @@ from source.models.xgboost_model import XGBoostModel
 from source.models.lightgbm_model import LightGBMModel
 
 __all__ = [
-    'BaseModel',
-    'RandomForestModel',
-    'XGBoostModel',
-    'LightGBMModel',
+    "BaseModel",
+    "RandomForestModel",
+    "XGBoostModel",
+    "LightGBMModel",
 ]
