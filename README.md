@@ -7,16 +7,14 @@
 ### Требования
 
 - [uv](https://docs.astral.sh/uv/) — менеджер пакетов и окружений (обязателен).
-  Python 3.14 uv скачает сам (версия задана в `.python-version`).
+  Python 3.14 uv скачает сам.
 - OpenMP — нужен XGBoost и LightGBM.
 
-| ОС | uv | OpenMP |
-|---|---|---|
-| macOS | `brew install uv` | `brew install libomp` |
-| Linux | `curl -LsSf https://astral.sh/uv/install.sh \| sh` | обычно уже есть; если нет: `sudo apt install libgomp1` (Debian/Ubuntu) или `sudo dnf install libgomp` (Fedora) |
-| Windows | `winget install --id=astral-sh.uv -e` или в PowerShell: `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 \| iex"` | входит в [Microsoft Visual C++ Redistributable](https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist) (`vcomp140.dll`); обычно уже установлен |
-
-Команды ниже одинаковы для всех ОС (в PowerShell тоже работают пути через `/`).
+| ОС      | uv                                                                                                | OpenMP                                                                                                                                                      |
+|---------|---------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| macOS   | `brew install uv`                                                                                 | `brew install libomp`                                                                                                                                       |
+| Linux   | `curl -LsSf https://astral.sh/uv/install.sh \| sh`                                                | обычно уже есть; если нет: `sudo apt install libgomp1` (Debian/Ubuntu) или `sudo dnf install libgomp` (Fedora)                                              |
+| Windows | PowerShell: `powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 \| iex"` | входит в [Microsoft Visual C++ Redistributable](https://learn.microsoft.com/cpp/windows/latest-supported-vc-redist) (`vcomp140.dll`); обычно уже установлен |
 
 ### Установка
 
@@ -34,20 +32,20 @@ uv run ruff format .    # форматирование
 
 ### Запуск
 
-Все команды запускаются из корня проекта (пути в конфигах относительные).
+Все команды запускаются из корня проекта.
 
 ```bash
-uv run python -m source.run --config configs/har.yaml --stage load     # загрузка цен с MOEX (сеть, долго) -> data/raw/
-uv run python -m source.run --config configs/har.yaml --stage process  # очистка и расчёт RV -> data/processed/
-uv run python -m source.run --config configs/har.yaml                  # обучение (stage train) -> reports/tables/har_results.csv
+uv run python main.py --config configs/har.yaml --stage load     # загрузка цен с MOEX -> data/raw/
+uv run python main.py --config configs/har.yaml --stage process  # очистка и расчет RV -> data/processed/
+uv run python main.py --config configs/har.yaml                  # обучение (stage train) -> reports/tables/har_results.csv
 ```
 
 Этапы `load` и `process` нужно выполнить один раз; дальше можно обучать любые модели.
-Если данных не хватает, команда подскажет, какой этап запустить.
 
 Готовые эксперименты: `configs/har.yaml`, `rf.yaml`, `xgb.yaml`, `lgbm.yaml`.
-Все значения по умолчанию лежат в `configs/default.yaml`; файл эксперимента
-переопределяет только то, что отличается. Новый эксперимент — новый YAML-файл в `configs/`.
+Все значения по умолчанию лежат в `configs/default.yaml`
+Файл эксперимента переопределяет только то, что отличается.
+Новый эксперимент — новый YAML-файл в `configs/`.
 Новая модель — класс в `source/models/` и строка в `MODELS` в `source/models/registry.py`.
 
 ## Структура проекта
@@ -61,7 +59,7 @@ QF_Vol_pred/
 │
 ├── source/                          # Главная папка с исходным кодом
 │   ├── config.py                    # Загрузка и проверка конфигов
-│   ├── run.py                       # Точка входа: этапы load / process / train
+│   ├── run.py                       # Этапы load / process / train (вызывается из main.py)
 │   │
 │   ├── data_processors/             # Обработка данных
 │   │   ├── data_loader.py           # Загрузка данных с MOEX ISS API
@@ -85,6 +83,8 @@ QF_Vol_pred/
 │   └── utils/                       # Вспомогательные утилиты
 │       ├── logger.py                # Единый логгер
 │       └── metrics.py               # Метрики (MSE, RMSE, MAE, R2)
+│
+├── main.py                          # Точка входа проекта
 │
 ├── tests/                           # Тесты (uv run pytest)
 │

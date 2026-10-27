@@ -13,7 +13,7 @@ from source.models.registry import get_model
 from source.utils.logger import Logger
 from source.utils.metrics import MetricsCalculator
 
-COMMAND = "uv run python -m source.run --config <конфиг>"
+COMMAND = "uv run python main.py --config <конфиг>"
 
 
 def load(config: Config) -> None:
@@ -188,7 +188,7 @@ def run(config: Config) -> pd.DataFrame:
 
 def main() -> None:
     """
-    Точка входа: uv run python -m source.run --config configs/<name>.yaml [--stage ...]
+    Точка входа (вызывается из main.py): uv run python main.py --config configs/<name>.yaml [--stage ...]
 
     Этапы: load — загрузка с MOEX, process — расчёт RV, train — обучение (по умолчанию).
     """
