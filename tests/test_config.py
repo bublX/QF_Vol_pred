@@ -81,6 +81,8 @@ def test_features_defaults_match_feature_engineer(tmp_path):
     config = load_config(write(tmp_path, "model: {name: rf}\n"))
     defaults = _defaults(FeatureEngineer)
     for name, value in vars(config.features).items():
+        if name == "feature_set":
+            continue
         assert value == defaults[name], name
 
 
@@ -101,3 +103,21 @@ def test_processing_defaults_match_data_processor(tmp_path):
 
 def test_default_file_exists():
     assert DEFAULT_CONFIG_PATH.exists()
+
+
+def test_unknown_model_name(tmp_path):
+    path = write(tmp_path, "model: {name: garch}\n")
+    with pytest.raises(ValueError, match="Неизвестная модель в 'model.name': 'garch'"):
+        load_config(path)
+
+
+def test_unknown_feature_set(tmp_path):
+    path = write(tmp_path, "model: {name: rf}\nfeatures: {feature_set: tiny}\n")
+    with pytest.raises(ValueError, match="feature_set"):
+        load_config(path)
+
+
+@pytest.mark.parametrize("name", ["har", "rf", "xgb", "lgbm"])
+def test_experiment_configs_load(name):
+    config = load_config(DEFAULT_CONFIG_PATH.parent / f"{name}.yaml")
+    assert config.model.name == name

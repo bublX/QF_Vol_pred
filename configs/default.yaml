@@ -25,6 +25,7 @@ processing:
   processed_dir: data/processed/
 
 features:
+  feature_set: full  # full | har (только rv_1, rv_5, rv_22)
   num_lags: [ 1, 2, 5, 10 ]
   windows: [ 5, 22 ]
   ma_windows: [ 20, 50 ]

@@ -6,11 +6,15 @@ from typing import Any, Union
 
 import yaml
 
+from source.models.registry import MODELS
+
 DEFAULT_CONFIG_PATH = (
     Path(__file__).resolve().parent.parent / "configs" / "default.yaml"
 )
 
 AVAILABLE_METRICS = ["mse", "rmse", "mae", "r2"]
+
+FEATURE_SETS = ["full", "har"]
 
 
 @dataclass
@@ -50,8 +54,11 @@ class ProcessingConfig:
 class FeaturesConfig:
     """
     Параметры генерации признаков (см. FeatureEngineer).
+
+    feature_set: 'full' — create_features, 'har' — create_har_features.
     """
 
+    feature_set: str
     num_lags: list[int]
     windows: list[int]
     ma_windows: list[int]
@@ -153,6 +160,17 @@ def load_config(
 
     if config.model.name is None:
         raise ValueError("'model.name' не задан: укажите модель в файле эксперимента")
+    if config.model.name not in MODELS:
+        raise ValueError(
+            f"Неизвестная модель в 'model.name': '{config.model.name}'. "
+            f"Доступные: {list(MODELS)}"
+        )
+
+    if config.features.feature_set not in FEATURE_SETS:
+        raise ValueError(
+            f"Неизвестный 'features.feature_set': '{config.features.feature_set}'. "
+            f"Доступные: {FEATURE_SETS}"
+        )
 
     unknown_metrics = [
         m for m in config.evaluation.metrics if m not in AVAILABLE_METRICS

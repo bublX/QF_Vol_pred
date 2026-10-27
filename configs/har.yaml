@@ -1,0 +1,9 @@
+model:
+  name: har
+
+features:
+  feature_set: har
+
+split:
+  valid_end: null
+  use_validation: false
