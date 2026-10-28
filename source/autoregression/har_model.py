@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 import statsmodels.api as sm
-from typing import Dict, List
+from typing import Dict, List, Optional
 from source.autoregression.base_ar import BaseARModel
 
 class HARModel(BaseARModel):
@@ -15,8 +15,8 @@ class HARModel(BaseARModel):
         lags : List[int] = [1, 5, 22]
     ):
         super().__init__('HAR', lags)
-        self._coef = None
-        self._intercept = None
+        self._coef : Optional[np.ndarray] = None
+        self._intercept : Optional[float] = None
 
     def fit(
         self,
@@ -42,8 +42,8 @@ class HARModel(BaseARModel):
         X_constant = sm.add_constant(X)
         self.model = sm.OLS(y, X_constant).fit()
 
-        self._intercept = self.model.params.iloc[0]
-        self._coef = self.model.params.iloc[1:].values
+        self._intercept = float(self.model.params.iloc[0])
+        self._coef = self.model.params.iloc[1:].to_numpy()
 
         self.is_trained = True
         self.logger.success(f'HAR обучен!')
@@ -85,9 +85,9 @@ class HARModel(BaseARModel):
         """
 
         params = super().get_params()
-        if self.is_trained:
+        if self._intercept is not None and self._coef is not None:
             params['intercept'] = float(self._intercept)
-            params['coef'] = self._coef.to_list()
+            params['coef'] = self._coef.tolist()
 
         return params
 

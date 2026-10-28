@@ -104,14 +104,12 @@ class LightGBMModel(BaseModel):
 
         if eval_set is not None and eval_set[0][0] is not None:
             X_valid, y_valid = eval_set[0]
-            eval_X = [X_valid.values]
-            eval_y = y_valid.values
             callbacks = [early_stopping(early_stopping_rounds), log_evaluation(period = -1)]
             if self.verbose:
-                self.model.fit(X, y, eval_X = eval_X, eval_y = eval_y, callbacks = callbacks)
+                self.model.fit(X, y, eval_X = X_valid, eval_y = y_valid, callbacks = callbacks)
             else:
                 with open(os.devnull, 'w') as f, redirect_stdout(f):
-                    self.model.fit(X, y, eval_X = eval_X, eval_y = eval_y, callbacks = callbacks)
+                    self.model.fit(X, y, eval_X = X_valid, eval_y = y_valid, callbacks = callbacks)
         else:
             self.model.fit(X, y)
 

@@ -39,7 +39,7 @@ class Logger:
     ):
         if hasattr(self, '_initialized'):
             return
-        self._initizialized = True
+        self._initialized= True
 
         self.logger = logging.getLogger(name)
         self.logger.setLevel(level)

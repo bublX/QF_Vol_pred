@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
 from source.utils.logger import Logger
-from typing import Tuple, Optional, List, Dict
+from typing import Tuple, List, Dict
 from pathlib import Path
 
 class DataProcessor:
@@ -16,49 +16,32 @@ class DataProcessor:
         Директория для сохранения 
     min_bars_per_day : int
         Минимальное допустимое число сделок в день
-    fat_finger_window : int
-        Окно для обработки fat-finger ошибок
-    fat_finger_threshold : float
-        Порог для обработки fat-finger ошибок
     max_return : float 
-        Максимальное допустимое значение доходностей
-    fat_finger_type : str 
-        Способ обработки fat-finger ошибок (standart или hampel)
-    fat_finger_sigma : float
-        Sigma значение для фильтра Хампеля
+        Максимальное допустимое значение доходностей в процентах
     hampel_const : float 
         Константа для фильтра Хампеля 
-    use_rv_filter : bool 
-        Флаг для использования фильтра Хампеля
-
-    Notes
-    -----
-    Фильтр `standart` заменяет выбросы на медиану окна.
-    Фильтр `hampel` использует MAD для адаптивного порога.
+    hampel_window : int
+        Полуширина окна в барах
+    hampel_sigma : float
+        Порог для фильтра в сигмах
     """
     def __init__(
         self,
         input_dir : str = 'data/raw/',
         output_dir : str = 'data/processed/',
         min_bars_per_day : int = 40,
-        fat_finger_window : int = 11,
-        fat_finger_threshold : float = 0.03,
-        max_return : float = 15.0,
-        fat_finger_type : str = 'standart',
-        fat_finger_sigma : float = 3.0,
+        max_return : float = 5.0,
         hampel_const : float = 1.4826,
-        use_rv_filter : bool = False
+        hampel_window : int = 5,
+        hampel_sigma : float = 3.0
     ):
         self.input_dir = Path(input_dir)
         self.output_dir = Path(output_dir)
         self.min_bars_per_day = min_bars_per_day
-        self.fat_finger_window = fat_finger_window
-        self.fat_finger_threshold = fat_finger_threshold
         self.max_return = max_return
-        self.fat_finger_type = fat_finger_type
-        self.fat_finger_sigma = fat_finger_sigma
         self.hampel_const = hampel_const
-        self.use_rv_filter = use_rv_filter
+        self.hampel_window = hampel_window
+        self.hampel_sigma = hampel_sigma
         self.logger = Logger('DataProcessor')
 
         self._results = {}
@@ -103,7 +86,7 @@ class DataProcessor:
     def process_ticker(
         self,
         ticker_df : pd.DataFrame,
-        save_path : Optional[str] = None
+        ticker : str = ''
     ) -> pd.DataFrame:
         """
         Обработать данные одного тикера.
@@ -112,21 +95,21 @@ class DataProcessor:
         ----------
         ticker_df : pd.DataFrame
             Данные тикера (date, close)
-        save_path : Optional[str]
-            Путь для сохранения (при желании)
+        ticker : str
+            Название тикера
         
         Returns
         -------
         pd.DataFrame
-            Обработанный DataFrame с колонками date, close, processed_close, returns
+            Обработанный DataFrame с колонками date, close, returns
         """
     
         ticker_df = self._prepare_data(ticker_df)
         ticker_df = self._filter_trading_hours(ticker_df)
         ticker_df = self._filter_valid_dates(ticker_df)
-        ticker_df = self._detect_fat_finger(ticker_df)
         ticker_df = self._calculate_returns(ticker_df)
-        ticker_df = self._filter_extreme_returns(ticker_df)
+        ticker_df = self._filter_returns_hampel(ticker_df, ticker)
+        ticker_df = self._clip_extreme_returns(ticker_df, ticker)
 
         return ticker_df
     
@@ -210,7 +193,7 @@ class DataProcessor:
         Returns
         -------
         pd.DataFrame
-            DataFrame с колонками date, close, time
+            DataFrame с колонками date, close
         """
 
         ticker_df = df[['date', f'{ticker}_close']].copy()
@@ -258,11 +241,6 @@ class DataProcessor:
         -------
         pd.DataFrame
             Отфильтрованный DataFrame
-        
-        Raises
-        ------
-        ValueError
-            Если нет колонки time
         """
 
         ticker_df = ticker_df.copy()
@@ -302,110 +280,7 @@ class DataProcessor:
         ticker_df.reset_index(inplace = True, drop = True)
 
         return ticker_df
-
-    def _detect_fat_finger(
-        self,
-        ticker_df : pd.DataFrame
-    ) -> pd.DataFrame:
-        """
-        Обнаружить и исправить выбросы fat-finger.
-        
-        Parameters
-        ----------
-        ticker_df : pd.DataFrame
-            Данные тикера
-        
-        Returns
-        -------
-        pd.DataFrame
-            DataFrame с колонками processed_close, fat_finger_flag
-        
-        Raises
-        ------
-        ValueError
-            Если неизвестный тип фильтра
-
-        Notes
-        -----
-        Поддерживает несколько способов обработки (standart, hampel)
-        """
-        
-        ticker_df = ticker_df.copy()
-
-        if self.fat_finger_type == 'standart':
-            results = ticker_df.groupby(ticker_df['date'].dt.date)['close'].apply(
-                lambda x : self._detect_fat_finger_single(
-                    x.values, 
-                    self.fat_finger_window, 
-                    self.fat_finger_threshold)
-                )
-
-        elif self.fat_finger_type == 'hampel':
-            results = ticker_df.groupby(ticker_df['date'].dt.date)['close'].apply(
-                            lambda x : self._filter_hampel(
-                                x.values,
-                                self.fat_finger_window,
-                                self.fat_finger_sigma,
-                                self.hampel_const)
-                            )
-        else:
-            self.logger.error(f"Неизвестный тип фильтра: {self.fat_finger_type}")
-            raise ValueError(f'Неизвестный тип фильтра: {self.fat_finger_type}')
-        
-        ticker_df['processed_close'] = np.concatenate([result[0] for result in results])
-        ticker_df['fat_finger_flag'] = np.concatenate([result[1] for result in results])
-
-        number_of_fat_fingers = ticker_df['fat_finger_flag'].sum()
-
-        if number_of_fat_fingers:
-            self.logger.warning(f"Fat-finger: {number_of_fat_fingers} замен")
-
-        return ticker_df
-
-    @staticmethod
-    def _detect_fat_finger_single(
-        prices : np.ndarray,
-        window_size : int,
-        threshold : float
-    ) -> Tuple[np.ndarray, np.ndarray]:
-
-        """
-        Обнаружить выбросы в одном массиве цен (стандартный метод).
-        
-        Parameters
-        ----------
-        prices : np.ndarray
-            Массив цен
-        window_size : int
-            Размер окна
-        threshold : float
-            Порог отклонения
-        
-        Returns
-        -------
-        Tuple[np.ndarray, np.ndarray]
-            (cleaned, flags) — очищенные цены и флаги
-        """
-
-        prices = np.asarray(prices, dtype = float)
-        length = len(prices)
-        prices_processed = prices.copy()
-        flags = np.zeros(length, dtype = bool)
-
-        for idx in range(window_size, length - window_size):
-            window = prices[idx - window_size : idx + window_size + 1]
-            med = np.median(window)
-
-            if med == 0:
-                continue
-            diff = np.abs(prices[idx] - med) / med
-
-            if diff > threshold:
-                flags[idx] = True
-                prices_processed[idx] = med
-
-        return prices_processed, flags
-
+    
     @staticmethod
     def _filter_hampel(
         series : np.ndarray,
@@ -421,7 +296,7 @@ class DataProcessor:
         series : np.ndarray
             Временной ряд
         window_size : int
-            Размер окна
+            Полуширина окна (окно = 2w + 1)
         sigma : float
             Порог в сигмах
         const : float
@@ -438,10 +313,13 @@ class DataProcessor:
         cleaned = series.copy()
         flags = np.zeros(series_length, dtype = bool)
 
-        for i in range(window_size, series_length - window_size):
-            window = series[i - window_size : i + window_size + 1]
-            r_median = np.median(window)
-            r_mad = np.median(np.abs(window - r_median))
+        for i in range(series_length):
+            if np.isnan(series[i]):
+                continue
+            low, high = max(0, i - window_size), min(series_length, i + window_size + 1)
+            window = series[low : high]
+            r_median = np.nanmedian(window)
+            r_mad = np.nanmedian(np.abs(window - r_median))
 
             if r_mad == 0:
                 continue
@@ -452,6 +330,44 @@ class DataProcessor:
 
         return cleaned, flags
 
+    def _filter_returns_hampel(
+        self, 
+        ticker_df : pd.DataFrame,
+        ticker : str = ''
+    ) -> pd.DataFrame:
+        """
+        Применить фильтр Хампеля к доходностям.
+        
+        Parameters
+        ----------
+        ticker_df : pd.DataFrame
+            Данные тикера
+        ticker : str
+            Название тикера
+        
+        Returns
+        -------
+        pd.DataFrame
+            DataFrame с очищенными доходностями
+        """
+
+        ticker_df = ticker_df.copy()
+        returns = ticker_df['returns'].to_numpy(dtype = float, copy = True)
+        flags = np.zeros(len(returns), dtype = bool)
+        daily_indices = ticker_df.groupby(ticker_df['date'].dt.date).indices.values()
+        for idx in daily_indices: 
+            returns[idx], flags[idx] = self._filter_hampel(
+                series = returns[idx], 
+                window_size = self.hampel_window, 
+                sigma = self.hampel_sigma, 
+                const = self.hampel_const
+            )
+
+        ticker_df['returns'] = returns
+        n = int(flags.sum())
+        self.logger.info(f'{ticker}: Hampel filter - {n} замен ({n / len(flags):.3%})')
+        return ticker_df
+    
     def _calculate_returns(
         self, 
         ticker_df : pd.DataFrame
@@ -471,32 +387,38 @@ class DataProcessor:
         """
         
         ticker_df = ticker_df.copy()
-        ticker_df['returns'] = np.log(ticker_df['processed_close'] / ticker_df.groupby(ticker_df['date'].dt.date)['processed_close'].shift(1)) * 100
+        ticker_df['returns'] = np.log(ticker_df['close'] / ticker_df.groupby(ticker_df['date'].dt.date)['close'].shift(1)) * 100
 
         return ticker_df
 
-    def _filter_extreme_returns(
+    def _clip_extreme_returns(
         self, 
-        ticker_df : pd.DataFrame
+        ticker_df : pd.DataFrame,
+        ticker : str = ''
     ) -> pd.DataFrame:
         """
-        Удалить экстремальные доходности (|returns| > max_return).
+        Винсоризация экстремальных доходностей (|returns| > max_return).
         
         Parameters
         ----------
         ticker_df : pd.DataFrame
             Данные тикера
+        ticker : str
+            Название тикера
         
         Returns
         -------
         pd.DataFrame
-            Отфильтрованный DataFrame
+            DataFrame с обрезанными доходностями
         """
 
         ticker_df = ticker_df.copy()
-        ticker_df = ticker_df[ticker_df['returns'].abs() <= self.max_return]
         ticker_df = ticker_df.dropna().reset_index(drop = True)
-
+        extreme_values = ticker_df['returns'].abs() > self.max_return
+        ticker_df['returns'] = ticker_df['returns'].clip(-self.max_return, self.max_return)
+        n = int(extreme_values.sum())
+        if n != 0:
+            self.logger.warning(f'{ticker}: обрезано {n} доходностей до ±{self.max_return}%')
         return ticker_df
 
     def _save_rv(
@@ -513,23 +435,11 @@ class DataProcessor:
             Данные тикера
         ticker : str
             Название тикера
-        
-        Notes
-        -----
-        Если use_rv_filter = True, применяется фильтр Хампеля на RV.
         """
 
         rv = ticker_df.groupby(ticker_df['date'].dt.date)['returns'].apply(lambda x : (x ** 2).sum()).reset_index()
         rv.columns = ['date', 'RV']
         rv['date'] = pd.to_datetime(rv['date'])
-
-        if self.use_rv_filter:
-            rv['RV'] = self._filter_hampel(
-                rv['RV'].values,
-                self.fat_finger_window,
-                self.fat_finger_sigma,
-                self.hampel_const
-            )[0]
 
         path = self.output_dir / f'RV/{ticker}_RV.csv'
         path.parent.mkdir(parents = True, exist_ok = True)
