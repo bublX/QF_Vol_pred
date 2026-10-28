@@ -54,14 +54,13 @@ def test_run_saves_results(config_path, tmp_path, model_yaml, file_name):
     )
 
 
-def _write_experiment(tmp_path, extra=""):
+def _write_experiment(tmp_path, data_extra=""):
     path = tmp_path / "exp.yaml"
     path.write_text(
         f"""
 model: {{name: rf}}
-data: {{tickers: [AAA, BBB], raw_dir: {tmp_path / "raw"}}}
+data: {{tickers: [AAA, BBB], raw_dir: {tmp_path / "raw"}{data_extra}}}
 processing: {{processed_dir: {tmp_path / "processed"}}}
-{extra}
 """,
         encoding="utf-8",
     )
@@ -97,7 +96,7 @@ def test_process_without_raw_data_suggests_load(tmp_path):
 
 def test_train_without_any_data_suggests_load_and_process(tmp_path):
     with pytest.raises(
-        FileNotFoundError, match="--stage load, затем .*--stage process"
+            FileNotFoundError, match="--stage load, затем .*--stage process"
     ):
         run(_write_experiment(tmp_path))
 
@@ -118,9 +117,9 @@ def test_load_passes_config_to_data_loader(tmp_path, monkeypatch):
         "source.run.DataLoader.load_all", lambda self: captured.update(vars(self))
     )
 
-    load(_write_experiment(tmp_path))
+    load(_write_experiment(tmp_path, data_extra=", start_year: 2019, end_year: 2020"))
 
     assert captured["tickers"] == ["AAA", "BBB"]
-    assert captured["start_year"] == 2014
-    assert captured["end_year"] == 2024
+    assert captured["start_year"] == 2019
+    assert captured["end_year"] == 2020
     assert captured["save_path"] == tmp_path / "raw" / "all_prices.csv"
