@@ -1,6 +1,7 @@
 import inspect
 
 import pytest
+import yaml
 
 from source.config import DEFAULT_CONFIG_PATH, load_config
 from source.data_processors.data_processor import DataProcessor
@@ -30,8 +31,9 @@ model:
     config = load_config(path)
 
     assert config.data.tickers == ["SBER"]
-    assert config.data.start_year == 2014
-    assert config.split.train_end == "2021-12-31"
+    defaults = yaml.safe_load(DEFAULT_CONFIG_PATH.read_text(encoding="utf-8"))
+    assert config.data.start_year == defaults["data"]["start_year"]
+    assert config.split.train_end == defaults["split"]["train_end"]
     assert config.split.valid_end is None
     assert config.split.use_validation is False
     assert config.model.params == {"n_estimators": 100, "max_depth": 10}
