@@ -154,6 +154,14 @@ def run(config: Config) -> pd.DataFrame:
 
         if config.split.use_validation:
             model.fit(X_train, y_train, eval_set=[(X_valid, y_valid)])
+            if config.split.refit:
+                n_trees = model.best_n_estimators
+                logger.info(
+                    f"{ticker}: early_stopping - {n_trees} деревьев, refit на train + valid"
+                )
+                params = {**config.model.params, "n_estimators": n_trees}
+                model = get_model(config.model.name, params)
+                model.fit(pd.concat([X_train, X_valid]), pd.concat([y_train, y_valid]))
         else:
             model.fit(X_train, y_train)
 

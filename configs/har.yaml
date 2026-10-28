@@ -5,5 +5,6 @@ features:
   feature_set: har
 
 split:
+  train_end: '2023-12-31'
   valid_end: null
   use_validation: false

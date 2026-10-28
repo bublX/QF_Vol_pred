@@ -72,6 +72,7 @@ class SplitConfig:
 
     train_end: str
     valid_end: str | None
+    refit: bool
     use_validation: bool
 
 

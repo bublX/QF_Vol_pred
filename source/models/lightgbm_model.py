@@ -72,6 +72,7 @@ class LightGBMModel(BaseModel):
             n_jobs=-1,
             **kwargs,
         )
+        self.best_n_estimators = None
 
     def fit(
         self,
@@ -98,6 +99,7 @@ class LightGBMModel(BaseModel):
         -----
         Если eval_set не передан — early stopping отключается.
         Вывод early stopping подавляется при помощи параметра verbose.
+        best_n_estimators — число деревьев после early stopping (без валидации — n_estimators)
         См. BaseModel.fit для общих параметров.
         """
 
@@ -114,13 +116,16 @@ class LightGBMModel(BaseModel):
                 self.model.fit(
                     X, y, eval_X=X_valid, eval_y=y_valid, callbacks=callbacks
                 )
+                self.best_n_estimators = self.model.best_iteration_
             else:
                 with open(os.devnull, "w") as f, redirect_stdout(f):
                     self.model.fit(
                         X, y, eval_X=X_valid, eval_y=y_valid, callbacks=callbacks
                     )
+                    self.best_n_estimators = self.model.best_iteration_
         else:
             self.model.fit(X, y)
+            self.best_n_estimators = self.model.n_estimators
 
         self.is_trained = True
 
