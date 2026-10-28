@@ -1,0 +1,47 @@
+# Значения по умолчанию для всех экспериментов.
+# Файл эксперимента (configs/<name>.yaml) переопределяет только то, что отличается.
+# Значения скопированы из scripts/*.py и аргументов по умолчанию в классах.
+# Даты указывать в кавычках, иначе YAML прочитает их как date, а не str.
+
+data:
+  tickers: [ VTBR, SBER, LKOH, ROSN, NVTK, TATN, GAZP, GMKN, NLMK, MGNT ]
+  start_year: 2014
+  end_year: 2024
+  interval: 10
+  delay: 0
+  base_url: https://iss.moex.com/iss/engines/stock/markets/shares/boards/TQBR/securities
+  raw_dir: data/raw/
+  raw_file: all_prices.csv
+
+processing:
+  min_bars_per_day: 40
+  max_return: 5
+  hampel_window: 5
+  hampel_sigma: 3.0
+  hampel_const: 1.4826
+  processed_dir: data/processed/
+
+features:
+  feature_set: full  # full | har (только rv_1, rv_5, rv_22)
+  num_lags: [ 1, 2, 5, 10 ]
+  windows: [ 5, 22 ]
+  ma_windows: [ 20, 50 ]
+  vol_ratio_windows: [ 10, 15, 20 ]
+  momentum_window: 20
+  rsi_window: 14
+
+split:
+  train_end: '2021-12-31'
+  valid_end: '2023-12-31'
+  use_validation: true
+
+model:
+  name: null  # обязательно задать в файле эксперимента: har, rf, xgb, lgbm
+  params: { }
+
+evaluation:
+  metrics: [ r2, rmse, mae, mse ]
+
+output:
+  reports_dir: reports/tables
+  name: null
