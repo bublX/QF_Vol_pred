@@ -114,7 +114,9 @@ def run(config: Config) -> pd.DataFrame:
             f"Нет обработанных данных: {rv_path}. Сначала выполните: {hint}"
         )
 
-    name = config.output.name or config.model.name
+    model_name = config.model.name
+    assert model_name is not None
+    name = config.output.name or model_name
     logger = Logger(f"Train{name.upper()}")
     logger.info(f"Обучение {config.model.name}")
 
@@ -149,7 +151,7 @@ def run(config: Config) -> pd.DataFrame:
     y_pred_dict = {}
 
     for ticker, (X_train, X_valid, X_test, y_train, y_valid, y_test) in splits.items():
-        model = get_model(config.model.name, config.model.params)
+        model = get_model(model_name, config.model.params)
         logger.step("Train", f"{model.name} для {ticker}")
 
         if config.split.use_validation:
@@ -160,7 +162,7 @@ def run(config: Config) -> pd.DataFrame:
                     f"{ticker}: early_stopping - {n_trees} деревьев, refit на train + valid"
                 )
                 params = {**config.model.params, "n_estimators": n_trees}
-                model = get_model(config.model.name, params)
+                model = get_model(model_name, params)
                 model.fit(pd.concat([X_train, X_valid]), pd.concat([y_train, y_valid]))
         else:
             model.fit(X_train, y_train)

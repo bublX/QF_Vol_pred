@@ -253,7 +253,7 @@ def _build(cls: type, values: Any, section: str) -> Any:
     for name in names:
         key = f"{section}.{name}" if section else name
         tp = hints[name]
-        if is_dataclass(tp):
+        if isinstance(tp, type) and is_dataclass(tp):
             kwargs[name] = _build(tp, values[name], key)
         else:
             if not _matches(values[name], tp):

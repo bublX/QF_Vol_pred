@@ -1,7 +1,6 @@
 import pandas as pd
 import numpy as np
 import os
-import sys
 from typing import List, Tuple
 from lightgbm import LGBMRegressor, early_stopping, log_evaluation
 from source.models.base import BaseModel
@@ -78,7 +77,7 @@ class LightGBMModel(BaseModel):
         self,
         X: pd.DataFrame,
         y: pd.Series,
-        eval_set: List[Tuple[pd.DataFrame, pd.Series]] = None,
+        eval_set: List[Tuple[pd.DataFrame, pd.Series]] | None = None,
         early_stopping_rounds: int = 50,
     ) -> "LightGBMModel":
         """
@@ -143,7 +142,7 @@ class LightGBMModel(BaseModel):
         self._check_is_trained()
         self._validate_input(X)
 
-        return self.model.predict(X)
+        return np.asarray(self.model.predict(X))
 
     def features_importance(self) -> dict:
         """

@@ -67,7 +67,7 @@ class XGBoostModel(BaseModel):
         self,
         X: pd.DataFrame,
         y: pd.Series,
-        eval_set: List[Tuple[pd.DataFrame, pd.Series]] = None,
+        eval_set: List[Tuple[pd.DataFrame, pd.Series]] | None = None,
         verbose: bool = False,
     ) -> "XGBoostModel":
         """
