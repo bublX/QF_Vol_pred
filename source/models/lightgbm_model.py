@@ -1,7 +1,6 @@
 import pandas as pd
 import numpy as np
 import os
-import sys
 from typing import List, Tuple
 from lightgbm import LGBMRegressor, early_stopping, log_evaluation
 from source.models.base import BaseModel
@@ -72,12 +71,13 @@ class LightGBMModel(BaseModel):
             n_jobs=-1,
             **kwargs,
         )
+        self.best_n_estimators = None
 
     def fit(
         self,
         X: pd.DataFrame,
         y: pd.Series,
-        eval_set: List[Tuple[pd.DataFrame, pd.Series]] = None,
+        eval_set: List[Tuple[pd.DataFrame, pd.Series]] | None = None,
         early_stopping_rounds: int = 50,
     ) -> "LightGBMModel":
         """
@@ -98,6 +98,7 @@ class LightGBMModel(BaseModel):
         -----
         Если eval_set не передан — early stopping отключается.
         Вывод early stopping подавляется при помощи параметра verbose.
+        best_n_estimators — число деревьев после early stopping (без валидации — n_estimators)
         См. BaseModel.fit для общих параметров.
         """
 
@@ -114,13 +115,16 @@ class LightGBMModel(BaseModel):
                 self.model.fit(
                     X, y, eval_X=X_valid, eval_y=y_valid, callbacks=callbacks
                 )
+                self.best_n_estimators = self.model.best_iteration_
             else:
                 with open(os.devnull, "w") as f, redirect_stdout(f):
                     self.model.fit(
                         X, y, eval_X=X_valid, eval_y=y_valid, callbacks=callbacks
                     )
+                    self.best_n_estimators = self.model.best_iteration_
         else:
             self.model.fit(X, y)
+            self.best_n_estimators = self.model.n_estimators
 
         self.is_trained = True
 
@@ -138,7 +142,7 @@ class LightGBMModel(BaseModel):
         self._check_is_trained()
         self._validate_input(X)
 
-        return self.model.predict(X)
+        return np.asarray(self.model.predict(X))
 
     def features_importance(self) -> dict:
         """

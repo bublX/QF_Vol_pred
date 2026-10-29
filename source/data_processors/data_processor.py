@@ -187,7 +187,7 @@ class DataProcessor:
 
         ticker_df = df[["date", f"{ticker}_close"]].copy()
         ticker_df = ticker_df.rename(columns={f"{ticker}_close": "close"})
-        ticker_df.dropna(inplace=True)
+        ticker_df = ticker_df.dropna()
 
         return ticker_df
 
@@ -262,8 +262,8 @@ class DataProcessor:
         counts = ticker_df.groupby(ticker_df["date"].dt.date).size()
         valid_dates = counts[counts >= self.min_bars_per_day].index
 
-        ticker_df = ticker_df[ticker_df["date"].dt.date.isin(valid_dates)]
-        ticker_df.reset_index(inplace=True, drop=True)
+        mask = ticker_df["date"].dt.date.isin(valid_dates)
+        ticker_df = ticker_df[mask].reset_index(drop=True)
 
         return ticker_df
 

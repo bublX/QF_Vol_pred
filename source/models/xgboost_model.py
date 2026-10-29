@@ -61,12 +61,13 @@ class XGBoostModel(BaseModel):
             n_jobs=-1,
             **kwargs,
         )
+        self.best_n_estimators = None
 
     def fit(
         self,
         X: pd.DataFrame,
         y: pd.Series,
-        eval_set: List[Tuple[pd.DataFrame, pd.Series]] = None,
+        eval_set: List[Tuple[pd.DataFrame, pd.Series]] | None = None,
         verbose: bool = False,
     ) -> "XGBoostModel":
         """
@@ -86,6 +87,7 @@ class XGBoostModel(BaseModel):
         Notes
         -----
         Если eval_set не передан — early stopping отключается.
+        best_n_estimators — число деревьев после early stopping (без валидации — n_estimators)
         См. BaseModel.fit для общих параметров.
         """
 
@@ -94,9 +96,11 @@ class XGBoostModel(BaseModel):
         if eval_set is not None and eval_set[0][0] is not None:
             self.model.set_params(early_stopping_rounds=self.early_stopping_rounds)
             self.model.fit(X, y, eval_set=eval_set, verbose=verbose)
+            self.best_n_estimators = self.model.best_iteration + 1
         else:
             self.model.set_params(early_stopping_rounds=None)
             self.model.fit(X, y)
+            self.best_n_estimators = self.model.n_estimators
 
         self.is_trained = True
         return self

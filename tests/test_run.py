@@ -3,6 +3,7 @@ import pandas as pd
 import pytest
 
 from source.config import load_config
+from source.models.registry import get_model
 from source.run import load, process, run
 
 
@@ -19,13 +20,13 @@ def config_path(tmp_path, monkeypatch):
     (tmp_path / "processed").mkdir()
     rv_matrix.to_csv(tmp_path / "processed" / "rv_matrix.csv", index=False)
 
-    def write(model_yaml):
+    def write(model_yaml, split_yaml="{valid_end: null, use_validation: false}"):
         path = tmp_path / "exp.yaml"
         path.write_text(
             f"""
 data: {{tickers: [AAA, BBB]}}
 processing: {{processed_dir: {tmp_path / "processed"}}}
-split: {{valid_end: null, use_validation: false}}
+split: {split_yaml}
 output: {{reports_dir: {tmp_path / "out"}}}
 {model_yaml}
 """,
@@ -52,6 +53,61 @@ def test_run_saves_results(config_path, tmp_path, model_yaml, file_name):
     assert np.allclose(
         saved[["R2", "RMSE", "MAE", "MSE"]], df[["R2", "RMSE", "MAE", "MSE"]]
     )
+
+
+def _spy_fits(monkeypatch):
+    """
+    Подменить get_model в run.py: каждый вызов fit записывается в список.
+    """
+
+    fits = []
+
+    def spy_get_model(name, params=None):
+        model = get_model(name, params)
+        real_fit = model.fit
+
+        def fit(X, y, **kwargs):
+            fits.append({"model": model, "rows": len(X), "params": params})
+            return real_fit(X, y, **kwargs)
+
+        model.fit = fit
+        return model
+
+    monkeypatch.setattr("source.run.get_model", spy_get_model)
+    return fits
+
+
+def _boosting_yaml(name, refit):
+    # Синтетика 2021-01..2022-06: train до сентября, valid — IV квартал, тест — 2022
+    model_yaml = f"model: {{name: {name}, params: {{n_estimators: 20}}}}"
+    split_yaml = (
+        "{train_end: '2021-09-30', valid_end: '2021-12-31', "
+        f"use_validation: true, refit: {'true' if refit else 'false'}}}"
+    )
+    return model_yaml, split_yaml
+
+
+@pytest.mark.parametrize("name", ["xgb", "lgbm"])
+def test_run_refits_on_train_and_valid(config_path, monkeypatch, name):
+    fits = _spy_fits(monkeypatch)
+
+    run(load_config(config_path(*_boosting_yaml(name, refit=True))))
+
+    assert len(fits) == 4  # 2 тикера × (early stopping + refit)
+    for first, refit in (fits[0:2], fits[2:4]):
+        assert first["params"]["n_estimators"] == 20
+        assert 1 <= first["model"].best_n_estimators <= 20
+        assert refit["params"]["n_estimators"] == first["model"].best_n_estimators
+        assert refit["rows"] > first["rows"]
+
+
+@pytest.mark.parametrize("name", ["xgb", "lgbm"])
+def test_run_without_refit_fits_once(config_path, monkeypatch, name):
+    fits = _spy_fits(monkeypatch)
+
+    run(load_config(config_path(*_boosting_yaml(name, refit=False))))
+
+    assert len(fits) == 2  # по одному fit на тикер
 
 
 def _write_experiment(tmp_path, data_extra=""):
@@ -96,7 +152,7 @@ def test_process_without_raw_data_suggests_load(tmp_path):
 
 def test_train_without_any_data_suggests_load_and_process(tmp_path):
     with pytest.raises(
-            FileNotFoundError, match="--stage load, затем .*--stage process"
+        FileNotFoundError, match="--stage load, затем .*--stage process"
     ):
         run(_write_experiment(tmp_path))
 

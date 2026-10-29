@@ -34,6 +34,7 @@ split:
   train_end: '2021-12-31'
   valid_end: '2023-12-31'
   use_validation: true
+  refit: true
 
 model:
   name: null  # обязательно задать в файле эксперимента: har, rf, xgb, lgbm
