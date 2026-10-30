@@ -82,7 +82,7 @@ QF_Vol_pred/
 │   │
 │   └── utils/                       # Вспомогательные утилиты
 │       ├── logger.py                # Единый логгер
-│       └── metrics.py               # Метрики (MSE, RMSE, MAE, R2)
+│       └── metrics.py               # Метрики (MSE, RMSE, MAE, R2, QLIKE, MAPE)
 │
 ├── main.py                          # Точка входа проекта
 │

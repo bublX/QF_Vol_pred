@@ -136,12 +136,9 @@ class FeatureEngineer:
 
         return pd.DataFrame(
             {
-                # f'{ticker}_rv_1' : np.sqrt(ticker_rv),
-                # f'{ticker}_rv_5' : np.sqrt(ticker_rv.rolling(5).mean()),
-                # f'{ticker}_rv_22': np.sqrt(ticker_rv.rolling(22).mean())
-                f"{ticker}_rv_1": ticker_rv,
-                f"{ticker}_rv_5": ticker_rv.rolling(5).mean(),
-                f"{ticker}_rv_22": ticker_rv.rolling(22).mean(),
+                f"{ticker}_rv_1": np.sqrt(ticker_rv),
+                f"{ticker}_rv_5": np.sqrt(ticker_rv.rolling(5).mean()),
+                f"{ticker}_rv_22": np.sqrt(ticker_rv.rolling(22).mean()),
             }
         )
 
@@ -280,8 +277,7 @@ class FeatureEngineer:
         result = df[["date"]].copy()
 
         for ticker in tickers:
-            # result[f'{ticker}_target'] = np.sqrt(df[f'{ticker}_RV'].shift(-1))
-            result[f"{ticker}_target"] = df[f"{ticker}_RV"].shift(-1)
+            result[f"{ticker}_target"] = np.sqrt(df[f"{ticker}_RV"].shift(-1))
 
         result = result.dropna().reset_index(drop=True)
         return result

@@ -12,7 +12,7 @@ DEFAULT_CONFIG_PATH = (
     Path(__file__).resolve().parent.parent / "configs" / "default.yaml"
 )
 
-AVAILABLE_METRICS = ["mse", "rmse", "mae", "r2"]
+AVAILABLE_METRICS = ["mse", "rmse", "mae", "r2", "qlike", "mape"]
 
 FEATURE_SETS = ["full", "har"]
 

@@ -61,8 +61,8 @@ def test_model_name_required(tmp_path):
 
 
 def test_unknown_metric(tmp_path):
-    path = write(tmp_path, "model: {name: rf}\nevaluation: {metrics: [rmse, qlike]}\n")
-    with pytest.raises(ValueError, match="qlike"):
+    path = write(tmp_path, "model: {name: rf}\nevaluation: {metrics: [rmse, auc]}\n")
+    with pytest.raises(ValueError, match="auc"):
         load_config(path)
 
 

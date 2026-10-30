@@ -48,11 +48,10 @@ def test_run_saves_results(config_path, tmp_path, model_yaml, file_name):
     df = run(load_config(config_path(model_yaml)))
 
     saved = pd.read_csv(tmp_path / "out" / file_name)
-    assert list(saved.columns) == ["Ticker", "R2", "RMSE", "MAE", "MSE"]
+    metrics = ["R2", "RMSE", "MAE", "MSE", "QLIKE", "MAPE"]
+    assert list(saved.columns) == ["Ticker", *metrics]
     assert list(saved["Ticker"]) == ["AAA", "BBB"]
-    assert np.allclose(
-        saved[["R2", "RMSE", "MAE", "MSE"]], df[["R2", "RMSE", "MAE", "MSE"]]
-    )
+    assert np.allclose(saved[metrics], df[metrics])
 
 
 def _spy_fits(monkeypatch):

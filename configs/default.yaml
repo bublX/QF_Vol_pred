@@ -41,7 +41,7 @@ model:
   params: { }
 
 evaluation:
-  metrics: [ r2, rmse, mae, mse ]
+  metrics: [ r2, rmse, mae, mse, qlike, mape ]
 
 output:
   reports_dir: reports/tables

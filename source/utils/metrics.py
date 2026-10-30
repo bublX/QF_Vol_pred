@@ -1,6 +1,11 @@
 import numpy as np
-from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
-from typing import Dict
+from sklearn.metrics import (
+    mean_squared_error,
+    mean_absolute_error,
+    r2_score,
+    mean_absolute_percentage_error,
+)
+from typing import Dict, Optional
 
 
 class MetricsCalculator:
@@ -20,10 +25,12 @@ class MetricsCalculator:
     - RMSE — Root Mean Squared Error
     - MAE — Mean Absolute Error
     - R2 — коэффициент детерминации
+    - QLIKE — Quasi-likelihood loss function
+    - MAPE — Mean Absolute Percentage Error
     """
 
-    def __init__(self, metrics: list = None):
-        self.metrics = metrics or ["MSE", "RMSE", "MAE", "R2"]
+    def __init__(self, metrics: Optional[list] = None):
+        self.metrics = metrics or ["MSE", "RMSE", "MAE", "R2", "QLIKE", "MAPE"]
 
     def calculate(self, y_true: np.ndarray, y_pred: np.ndarray) -> Dict[str, float]:
         """
@@ -67,6 +74,12 @@ class MetricsCalculator:
         if "R2" in self.metrics:
             results["R2"] = r2_score(y_true, y_pred)
 
+        if "QLIKE" in self.metrics:
+            results["QLIKE"] = self.qlike(y_true, y_pred)
+
+        if "MAPE" in self.metrics:
+            results["MAPE"] = mean_absolute_percentage_error(y_true, y_pred)
+
         return results
 
     def calculate_all(
@@ -94,3 +107,18 @@ class MetricsCalculator:
             results[ticker] = self.calculate(y_true_dict[ticker], y_pred_dict[ticker])
 
         return results
+
+    @staticmethod
+    def qlike(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+        """
+        QLIKE = mean(y / p - ln(y / p) - 1), 0 при идеальном прогнозе.
+
+        Notes
+        -----
+        Считается на шкале дисперсии (RV), y_true > 0. Занижение прогноза
+        штрафуется сильнее завышения. Прогноз p <= 0 заменяется на 1e-8:
+        штраф огромный, но конечный (иначе nan).
+        """
+
+        ratio = y_true / np.maximum(y_pred, 1e-8)
+        return float(np.mean(ratio - np.log(ratio) - 1))
