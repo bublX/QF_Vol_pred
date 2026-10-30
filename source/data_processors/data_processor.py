@@ -219,7 +219,7 @@ class DataProcessor:
         ticker_df: pd.DataFrame,
     ) -> pd.DataFrame:
         """
-        Оставить только бары в торговые часы (10:00–18:50).
+        Оставить только бары в торговые часы (10:00–18:50) и только будние дни.
 
         Parameters
         ----------
@@ -237,7 +237,8 @@ class DataProcessor:
         hour = ticker_df["date"].dt.hour
         minute = ticker_df["date"].dt.minute
 
-        mask = (hour < 18) | ((hour == 18) & (minute <= 50))
+        weekday = ticker_df["date"].dt.day_of_week < 5
+        mask = (hour >= 10) & ((hour < 18) | ((hour == 18) & (minute <= 50))) & weekday
         ticker_df = ticker_df[mask].reset_index(drop=True)
 
         return ticker_df
