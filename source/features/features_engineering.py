@@ -261,7 +261,7 @@ class FeatureEngineer:
 
     def create_targets(self, df: pd.DataFrame, tickers: list) -> pd.DataFrame:
         """
-        Создать целевую переменную (RV на следующий день).
+        Создать целевую переменную (sqrt{RV} на следующий день).
 
         Parameters
         ----------

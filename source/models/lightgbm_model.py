@@ -31,6 +31,8 @@ class LightGBMModel(BaseModel):
         Доля объектов для обучения
     subsample_freq : int
         Частота подвыборки
+    colsample_bytree : float
+        Доля признаков для каждого дерева
     random_state : int
         Seed для воспроизводимости
     verbose : bool
@@ -51,6 +53,7 @@ class LightGBMModel(BaseModel):
         reg_lambda: float = 1,
         subsample: float = 0.8,
         subsample_freq: int = 5,
+        colsample_bytree: float = 0.8,
         random_state: int = 42,
         verbose: bool = False,
         **kwargs,
@@ -69,6 +72,7 @@ class LightGBMModel(BaseModel):
             random_state=random_state,
             verbosity=-1,
             n_jobs=-1,
+            colsample_bytree=colsample_bytree,
             **kwargs,
         )
         self.best_n_estimators = None

@@ -9,9 +9,9 @@ def test_qlike_and_mape():
     y = np.array([1.0, 2.0, 4.0])
 
     assert calculator.calculate(y, y) == pytest.approx({"QLIKE": 0, "MAPE": 0})
-    # прогноз вдвое выше: y / p = 0.5, ошибка 100%
+    # прогноз σ вдвое выше: σ² / p² = 0.25, ошибка 100%
     assert calculator.calculate(y, 2 * y) == pytest.approx(
-        {"QLIKE": 0.5 - np.log(0.5) - 1, "MAPE": 1.0}
+        {"QLIKE": 0.25 - np.log(0.25) - 1, "MAPE": 1.0}
     )
 
 
@@ -23,3 +23,9 @@ def test_qlike_penalizes_underprediction_more():
 def test_qlike_finite_for_nonpositive_prediction():
     y = np.array([1.0, 2.0])
     assert np.isfinite(MetricsCalculator.qlike(y, np.array([0.0, -1.0])))
+
+
+def test_qlike_negative_sigma_is_not_squared_away():
+    calculator = MetricsCalculator(["QLIKE"])
+    y = np.array([1.0, 2.0])
+    assert calculator.calculate(y, -y)["QLIKE"] > 1e6

@@ -10,13 +10,13 @@ from typing import Dict, Optional
 
 class MetricsCalculator:
     """
-    Калькулятор метрик для оценки прогнозов RV.
+    Калькулятор метрик для оценки прогнозов sqrt{RV}.
 
     Parameters
     ----------
     metrics : list, optional
         Список метрик для расчёта.
-        По умолчанию ['MSE', 'RMSE', 'MAE', 'R2'].
+        По умолчанию ['MSE', 'RMSE', 'MAE', 'R2', 'QLIKE', 'MAPE'].
 
     Notes
     -----
@@ -27,6 +27,7 @@ class MetricsCalculator:
     - R2 — коэффициент детерминации
     - QLIKE — Quasi-likelihood loss function
     - MAPE — Mean Absolute Percentage Error
+    Все метрики считаются на шкале σ, кроме QLIKE: она на дисперсии (σ²), отрицательный прогноз σ заменяется на 0
     """
 
     def __init__(self, metrics: Optional[list] = None):
@@ -75,7 +76,7 @@ class MetricsCalculator:
             results["R2"] = r2_score(y_true, y_pred)
 
         if "QLIKE" in self.metrics:
-            results["QLIKE"] = self.qlike(y_true, y_pred)
+            results["QLIKE"] = self.qlike(y_true**2, np.maximum(y_pred, 0) ** 2)
 
         if "MAPE" in self.metrics:
             results["MAPE"] = mean_absolute_percentage_error(y_true, y_pred)
