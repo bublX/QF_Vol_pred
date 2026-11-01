@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import datetime as dt
 from source.utils.logger import Logger
 from typing import Tuple, List, Dict
 from pathlib import Path
@@ -106,10 +107,11 @@ class DataProcessor:
             Обработанный DataFrame с колонками date, close, returns
         """
 
-        ticker_df = self._prepare_data(ticker_df)
-        ticker_df = self._filter_trading_hours(ticker_df)
-        ticker_df = self._filter_valid_dates(ticker_df)
-        ticker_df = self._calculate_returns(ticker_df)
+        ticker_df = self._prepare_data(ticker_df, ticker)
+        ticker_df = self._filter_trading_hours(ticker_df, ticker)
+        ticker_df = self._filter_valid_dates(ticker_df, ticker)
+        ticker_df = self._filter_within_day(ticker_df, ticker)
+        ticker_df = self._calculate_returns(ticker_df, ticker)
         ticker_df = self._filter_returns_hampel(ticker_df, ticker)
         ticker_df = self._clip_extreme_returns(ticker_df, ticker)
 
@@ -233,12 +235,10 @@ class DataProcessor:
 
         ticker_df = df[["date", f"{ticker}_close"]].copy()
         ticker_df = ticker_df.rename(columns={f"{ticker}_close": "close"})
-        ticker_df = ticker_df.dropna()
 
         return ticker_df
 
-    @staticmethod
-    def _prepare_data(ticker_df: pd.DataFrame) -> pd.DataFrame:
+    def _prepare_data(self, ticker_df: pd.DataFrame, ticker: str = "") -> pd.DataFrame:
         """
         Подготовить данные: преобразовать date, отсортировать.
 
@@ -246,6 +246,8 @@ class DataProcessor:
         ----------
         ticker_df : pd.DataFrame
             Данные тикера
+        ticker : str
+            Название тикера
 
         Returns
         -------
@@ -258,11 +260,13 @@ class DataProcessor:
         ticker_df["date"] = pd.to_datetime(ticker_df["date"])
         ticker_df = ticker_df.sort_values("date").reset_index(drop=True)
 
+        self.logger.info(
+            f"{ticker}: данные подготовлены (дата преобразована, отсортировано)"
+        )
         return ticker_df
 
     def _filter_trading_hours(
-        self,
-        ticker_df: pd.DataFrame,
+        self, ticker_df: pd.DataFrame, ticker: str = ""
     ) -> pd.DataFrame:
         """
         Оставить только бары в торговые часы (10:00–18:50) и только будние дни.
@@ -271,6 +275,8 @@ class DataProcessor:
         ----------
         ticker_df : pd.DataFrame
             Данные тикера
+        ticker : str
+            Название тикера
 
         Returns
         -------
@@ -280,16 +286,17 @@ class DataProcessor:
 
         ticker_df = ticker_df.copy()
 
-        hour = ticker_df["date"].dt.hour
-        minute = ticker_df["date"].dt.minute
-
         weekday = ticker_df["date"].dt.day_of_week < 5
-        mask = (hour >= 10) & ((hour < 18) | ((hour == 18) & (minute <= 50))) & weekday
+        time = ticker_df["date"].dt.time
+        mask = (time > dt.time(10, 0)) & (time < dt.time(18, 50)) & weekday
         ticker_df = ticker_df[mask].reset_index(drop=True)
 
+        self.logger.info(f"{ticker}: оставлены бары в торговые часы и будние дни")
         return ticker_df
 
-    def _filter_valid_dates(self, ticker_df: pd.DataFrame) -> pd.DataFrame:
+    def _filter_valid_dates(
+        self, ticker_df: pd.DataFrame, ticker: str = ""
+    ) -> pd.DataFrame:
         """
         Оставить только дни с достаточным числом баров.
 
@@ -297,6 +304,8 @@ class DataProcessor:
         ----------
         ticker_df : pd.DataFrame
             Данные тикера
+        ticker : str
+            Название тикера
 
         Returns
         -------
@@ -306,12 +315,44 @@ class DataProcessor:
 
         ticker_df = ticker_df.copy()
 
-        counts = ticker_df.groupby(ticker_df["date"].dt.date).size()
+        counts = ticker_df.groupby(ticker_df["date"].dt.date)["close"].count()
         valid_dates = counts[counts >= self.min_bars_per_day].index
 
         mask = ticker_df["date"].dt.date.isin(valid_dates)
         ticker_df = ticker_df[mask].reset_index(drop=True)
 
+        self.logger.info(
+            f"{ticker}: оставлено {len(valid_dates)} дней с >= {self.min_bars_per_day} баров ({len(ticker_df)} строк)"
+        )
+        return ticker_df
+
+    def _filter_within_day(
+        self, ticker_df: pd.DataFrame, ticker: str = ""
+    ) -> pd.DataFrame:
+        """
+        Заполнить пропуски цены последней ценой внутри дня.
+
+        Parameters
+        ----------
+        ticker_df : pd.DataFrame
+            Данные тикера
+        ticker : str
+            Название тикера
+
+        Returns
+        -------
+        pd.DataFrame
+            Отфильтрованный DataFrame
+        """
+
+        ticker_df = ticker_df.copy()
+        missing = int(ticker_df["close"].isna().sum())
+        day = ticker_df["date"].dt.date
+        ticker_df["close"] = ticker_df.groupby(day)["close"].ffill()
+        filled = missing - int(ticker_df["close"].isna().sum())
+        ticker_df = ticker_df.dropna(subset=["close"]).reset_index(drop=True)
+
+        self.logger.info(f"{ticker}: ffill внутри дня - {filled} баров")
         return ticker_df
 
     @staticmethod
@@ -396,10 +437,13 @@ class DataProcessor:
 
         ticker_df["returns"] = returns
         n = int(flags.sum())
+
         self.logger.info(f"{ticker}: Hampel filter - {n} замен ({n / len(flags):.3%})")
         return ticker_df
 
-    def _calculate_returns(self, ticker_df: pd.DataFrame) -> pd.DataFrame:
+    def _calculate_returns(
+        self, ticker_df: pd.DataFrame, ticker: str = ""
+    ) -> pd.DataFrame:
         """
         Рассчитать логарифмические доходности.
 
@@ -407,6 +451,8 @@ class DataProcessor:
         ----------
         ticker_df : pd.DataFrame
             Данные тикера
+        ticker : str
+            Название тикера
 
         Returns
         -------
@@ -423,6 +469,7 @@ class DataProcessor:
             * 100
         )
 
+        self.logger.info(f"{ticker}: доходности рассчитаны")
         return ticker_df
 
     def _clip_extreme_returns(
