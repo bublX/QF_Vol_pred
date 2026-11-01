@@ -49,6 +49,7 @@ class DataProcessor:
         self.hampel_window = hampel_window
         self.hampel_sigma = hampel_sigma
         self.interval = interval
+        self.missing_days = {}
         self.logger = Logger("DataProcessor")
 
         self._results = {}
@@ -84,6 +85,7 @@ class DataProcessor:
             self._save_rv(df_processed_ticker, ticker)
             self.logger.success(f"{ticker}: RV сохранен")
 
+        self._save_missing_days()
         self._save_rv_matrix(tickers)
         self._save_profitabilities_matrix(tickers)
         self.logger.success("Матрицы сохранены")
@@ -317,6 +319,15 @@ class DataProcessor:
 
         counts = ticker_df.groupby(ticker_df["date"].dt.date)["close"].count()
         valid_dates = counts[counts >= self.min_bars_per_day].index
+        missing_dates = counts[counts < self.min_bars_per_day]
+        self.missing_days[ticker] = missing_dates
+        if not missing_dates.empty:
+            self.logger.warning(
+                f"{ticker}: пропущено {len(missing_dates)} дней с < {self.min_bars_per_day} баров"
+            )
+        if valid_dates.empty:
+            self.logger.error(f"{ticker}: нет дней с >= {self.min_bars_per_day} баров")
+            raise ValueError(f"{ticker}: нет дней с >= {self.min_bars_per_day} баров")
 
         mask = ticker_df["date"].dt.date.isin(valid_dates)
         ticker_df = ticker_df[mask].reset_index(drop=True)
@@ -325,6 +336,29 @@ class DataProcessor:
             f"{ticker}: оставлено {len(valid_dates)} дней с >= {self.min_bars_per_day} баров ({len(ticker_df)} строк)"
         )
         return ticker_df
+
+    def _save_missing_days(self) -> None:
+        """
+        Сохранить пропущенные дни в CSV.
+
+        Notes
+        -----
+        Дни, в которые биржа была закрыта целиком, не попадают, так как в этом случае нет ни одной строки.
+        Сохраняются только дни, в которые было меньше min_bars_per_day баров.
+        """
+
+        rows = [
+            {"ticker": ticker, "date": date, "bars": bars}
+            for ticker, missing in self.missing_days.items()
+            for date, bars in missing.items()
+        ]
+        missing_days = pd.DataFrame(rows, columns=["ticker", "date", "bars"])
+        missing_days.to_csv(self.output_dir / "missing_days.csv", index=False)
+
+        self.logger.info(
+            f"Исключённые дни: {len(missing_days)} тикер-дней, "
+            f"{missing_days['date'].nunique()} дат -> missing_days.csv"
+        )
 
     def _filter_within_day(
         self, ticker_df: pd.DataFrame, ticker: str = ""
