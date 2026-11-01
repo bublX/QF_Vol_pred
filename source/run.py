@@ -74,6 +74,7 @@ def process(config: Config) -> None:
         hampel_window=proc_cfg.hampel_window,
         hampel_sigma=proc_cfg.hampel_sigma,
         hampel_const=proc_cfg.hampel_const,
+        interval=config.data.interval,
     )
 
     processor.process_all(config.data.raw_file)

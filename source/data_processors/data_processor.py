@@ -25,6 +25,8 @@ class DataProcessor:
         Полуширина окна в барах
     hampel_sigma : float
         Порог для фильтра в сигмах
+    interval : int
+        Интервал длины свечи в минутах
     """
 
     def __init__(
@@ -36,6 +38,7 @@ class DataProcessor:
         hampel_const: float = 1.4826,
         hampel_window: int = 5,
         hampel_sigma: float = 3.0,
+        interval: int = 10,
     ):
         self.input_dir = Path(input_dir)
         self.output_dir = Path(output_dir)
@@ -44,6 +47,7 @@ class DataProcessor:
         self.hampel_const = hampel_const
         self.hampel_window = hampel_window
         self.hampel_sigma = hampel_sigma
+        self.interval = interval
         self.logger = Logger("DataProcessor")
 
         self._results = {}
@@ -68,6 +72,7 @@ class DataProcessor:
         self.logger.info(f"Обработка {input_file}")
 
         df_all = self._load_data(input_file)
+        df_all = self._align_to_slots(df_all)
         tickers = self._get_tickers_names(df_all)
 
         for ticker in tickers:
@@ -145,6 +150,47 @@ class DataProcessor:
             raise ValueError(f"Неверный формат: {path.suffix}")
 
         return df
+
+    def _align_to_slots(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Выровнять свечи тикеров по слотам интервала (например, 10 минут): одна строка на слот.
+
+        Parameters
+        ----------
+        df : pd.DataFrame
+            DataFrame с колонками date, {ticker}_close
+
+        Returns
+        -------
+        pd.DataFrame
+            DataFrame с выровненными слотами (10:50:00 - 10:59:59 -> 10:59:59)
+
+        Notes
+        -----
+        Если у тикера в слоте несколько свечей, то берется последняя по времени:
+        её close будет считаться ценой закрытия слота.
+        """
+
+        df = df.copy()
+        df["date"] = pd.to_datetime(df["date"])
+        df = df.sort_values("date").reset_index(drop=True)
+        freq = pd.Timedelta(minutes=self.interval)
+        df["date"] = df["date"].dt.floor(freq=freq) + freq - pd.Timedelta(seconds=1)
+
+        closes = [col for col in df.columns if col.endswith("_close")]
+        duplicates = (df.groupby("date")[closes].count() > 1).sum()
+        duplicates = duplicates[duplicates > 0]
+        if not duplicates.empty:
+            self.logger.warning(
+                f"Найдены дубликаты по слотам: {duplicates.to_dict()}, берем только последнюю."
+            )
+
+        aligned = df.groupby("date", as_index=False).last()
+        self.logger.info(
+            f"Выровнивание по {self.interval} минут: {len(df)} строк - {len(aligned)} слотов."
+        )
+
+        return aligned
 
     @staticmethod
     def _get_tickers_names(df: pd.DataFrame) -> List[str]:
