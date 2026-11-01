@@ -564,7 +564,7 @@ class DataProcessor:
 
     def _save_rv_matrix(self, tickers: List[str]) -> None:
         """
-        Объединить RV всех тикеров в одну таблицу.
+        Объединить RV всех тикеров в одну таблицу (только те, где есть данные у всех тикеров).
 
         Parameters
         ----------
@@ -581,11 +581,15 @@ class DataProcessor:
 
         rv_matrix = rv_list[0]
         for rv in rv_list[1:]:
-            rv_matrix = pd.merge(rv_matrix, rv, on="date", how="outer")
+            rv_matrix = pd.merge(rv_matrix, rv, on="date", how="inner")
 
         rv_matrix = rv_matrix.sort_values("date").reset_index(drop=True)
-        rv_matrix = rv_matrix.ffill()
-        rv_matrix = rv_matrix.dropna().reset_index(drop=True)
+        all_dates = pd.concat([rv["date"] for rv in rv_list]).nunique()
+        dropped = all_dates - len(rv_matrix)
+        if dropped:
+            self.logger.warning(
+                f"rv_matrix: исключено {dropped} дат, где RV есть не у всех тикеров (см. missing_days.csv)"
+            )
 
         rv_matrix.to_csv(self.output_dir / "rv_matrix.csv", index=False)
 
