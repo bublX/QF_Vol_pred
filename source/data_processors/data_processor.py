@@ -187,7 +187,7 @@ class DataProcessor:
 
         aligned = df.groupby("date", as_index=False).last()
         self.logger.info(
-            f"Выровнивание по {self.interval} минут: {len(df)} строк - {len(aligned)} слотов."
+            f"Выравнивание по {self.interval} минут: {len(df)} строк - {len(aligned)} слотов."
         )
 
         return aligned
