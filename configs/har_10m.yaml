@@ -1,0 +1,17 @@
+model:
+  name: har
+
+features:
+  feature_set: har
+
+processing:
+  processed_dir: data/processed/10m_2014_2025/
+  hampel_window: 10
+
+split:
+  train_end: '2023-12-31'
+  valid_end: null
+  use_validation: false
+
+output:
+  name: har_10m_2014_2025

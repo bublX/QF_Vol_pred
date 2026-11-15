@@ -1,0 +1,19 @@
+model:
+  name: har
+
+features:
+  feature_set: har
+
+data:
+  interval: 5
+
+processing:
+  processed_dir: data/processed/5m_2014_2025/
+
+split:
+  train_end: '2023-12-31'
+  valid_end: null
+  use_validation: false
+
+output:
+  name: har_5m_2014_2025

@@ -11,11 +11,12 @@ data:
   interval: 10
   delay: 0
   base_url: https://iss.moex.com/iss/engines/stock/markets/shares/securities
-  raw_dir: data/raw/
-  raw_file: all_prices.csv
+  raw_dir: data/raw/1m_2014_2025/
+  raw_file: prices_1m_2014_2025.csv
 
 processing:
-  min_bars_per_day: 40
+  min_day_coverage : 0.75
+  min_bar_coverage : 0.0
   max_return: 5
   hampel_window: 5
   hampel_sigma: 3.0
