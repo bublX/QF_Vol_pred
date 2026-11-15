@@ -7,9 +7,10 @@ data:
   tickers: [ VTBR, SBER, LKOH, ROSN, NVTK, TATN, GAZP, GMKN, NLMK, MGNT ]
   start_year: 2014
   end_year: 2025
+  source_interval : 1
   interval: 10
   delay: 0
-  base_url: https://iss.moex.com/iss/engines/stock/markets/shares/boards/TQBR/securities
+  base_url: https://iss.moex.com/iss/engines/stock/markets/shares/securities
   raw_dir: data/raw/
   raw_file: all_prices.csv
 
