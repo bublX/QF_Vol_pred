@@ -172,8 +172,16 @@ def test_load_passes_config_to_data_loader(tmp_path, monkeypatch):
         "source.run.DataLoader.load_all", lambda self: captured.update(vars(self))
     )
 
-    load(_write_experiment(tmp_path, data_extra=", start_year: 2019, end_year: 2020"))
+    load(
+        _write_experiment(
+            tmp_path,
+            data_extra=(
+                ", start_year: 2019, end_year: 2020, source_interval: 1, interval: 5"
+            ),
+        )
+    )
 
+    assert captured["interval"] == 1
     assert captured["tickers"] == ["AAA", "BBB"]
     assert captured["start_year"] == 2019
     assert captured["end_year"] == 2020
