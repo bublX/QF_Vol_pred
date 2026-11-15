@@ -92,7 +92,8 @@ def test_processing_defaults_match_data_processor(tmp_path):
     config = load_config(write(tmp_path, "model: {name: rf}\n"))
     defaults = _defaults(DataProcessor)
     for name in [
-        "min_bars_per_day",
+        "min_day_coverage",
+        "min_bar_coverage",
         "max_return",
         "hampel_window",
         "hampel_sigma",
