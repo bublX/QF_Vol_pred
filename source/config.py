@@ -40,7 +40,8 @@ class ProcessingConfig:
     Параметры очистки данных и расчёта RV (см. DataProcessor).
     """
 
-    min_bars_per_day: int
+    min_day_coverage: float
+    min_bar_coverage: float
     max_return: float
     hampel_window: int
     hampel_sigma: float

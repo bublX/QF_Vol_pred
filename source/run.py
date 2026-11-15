@@ -41,7 +41,7 @@ def load(config: Config) -> None:
         filename=data_cfg.raw_file,
         base_url=data_cfg.base_url,
     )
-    loader.load_all()
+    loader.load_all(save_individual=True)
 
 
 def process(config: Config) -> None:
@@ -69,7 +69,8 @@ def process(config: Config) -> None:
     processor = DataProcessor(
         input_dir=config.data.raw_dir,
         output_dir=proc_cfg.processed_dir,
-        min_bars_per_day=proc_cfg.min_bars_per_day,
+        min_day_coverage=proc_cfg.min_day_coverage,
+        min_bar_coverage=proc_cfg.min_bar_coverage,
         max_return=proc_cfg.max_return,
         hampel_window=proc_cfg.hampel_window,
         hampel_sigma=proc_cfg.hampel_sigma,

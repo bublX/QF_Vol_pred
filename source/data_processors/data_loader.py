@@ -192,10 +192,21 @@ class DataLoader:
             try:
                 response = self._session.get(url, params=params, timeout=30)
                 response.raise_for_status()
+                retry_count = 0
 
-            except requests.exceptions.ConnectionError:
-                self.logger.error("Нет интернет соединения!")
-                raise RuntimeError("Нет интернет соединения!") from None
+            except requests.exceptions.ConnectionError as excep:
+                retry_count += 1
+                message = (
+                    f"Сбой соединения с MOEX: {params['from']}, "
+                    f"start={params['start']}: {excep}"
+                )
+                if retry_count > max_tries:
+                    self.logger.error(message)
+                    raise RuntimeError(message) from excep
+
+                self.logger.warning(f"{message}. Повтор {retry_count}/{max_tries}")
+                time.sleep(2 * retry_count)
+                continue
 
             except requests.exceptions.HTTPError as excep:
                 if excep.response.status_code == 429:
@@ -349,5 +360,6 @@ class DataLoader:
         ticker : str
             Название тикера
         """
+        self._save_dir.mkdir(parents=True, exist_ok=True)
         path = self._save_dir / f"{ticker}.csv"
         ticker_df.to_csv(path, index=False)

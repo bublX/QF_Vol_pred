@@ -4,6 +4,7 @@ import datetime as dt
 from source.utils.logger import Logger
 from typing import Tuple, List, Dict
 from pathlib import Path
+from math import ceil
 
 
 class DataProcessor:
@@ -34,7 +35,8 @@ class DataProcessor:
         self,
         input_dir: str = "data/raw/",
         output_dir: str = "data/processed/",
-        min_bars_per_day: int = 40,
+        min_day_coverage: float = 0.75,
+        min_bar_coverage: float = 0.0,
         max_return: float = 5.0,
         hampel_const: float = 1.4826,
         hampel_window: int = 5,
@@ -44,7 +46,6 @@ class DataProcessor:
     ):
         self.input_dir = Path(input_dir)
         self.output_dir = Path(output_dir)
-        self.min_bars_per_day = min_bars_per_day
         self.max_return = max_return
         self.hampel_const = hampel_const
         self.hampel_window = hampel_window
@@ -64,6 +65,22 @@ class DataProcessor:
                 "Итоговый интервал должен быть больше 0 и кратным исходному"
             )
         self.source_interval = source_interval
+        if not 0 < min_day_coverage <= 1:
+            raise ValueError("min_day_coverage должен быть в диапазоне (0, 1]")
+
+        session_minutes = 8 * 60 + 50
+        expected_bars = session_minutes // interval
+        if expected_bars < 2:
+            raise ValueError("Для расчёта RV нужны хотя бы два бара за сессию")
+
+        self.expected_bars_per_day = expected_bars
+        self.min_day_coverage = min_day_coverage
+        self.min_bars_per_day = max(2, ceil(expected_bars * min_day_coverage))
+
+        if not 0 <= min_bar_coverage <= 1:
+            raise ValueError("min_bar_coverage должен быть в диапазоне [0, 1]")
+
+        self.min_bar_coverage = min_bar_coverage
 
     def process_all(
         self, input_file: str = "all_prices.csv"
@@ -191,13 +208,17 @@ class DataProcessor:
         df = self._filter_trading_hours(df)
 
         closes = [col for col in df.columns if col.endswith("_close")]
+        if df.empty:
+            return df[["date", *closes]]
+
         day = df["date"].dt.normalize()
-        elapsed = df["date"] - day
-
         source_freq = pd.Timedelta(minutes=self.source_interval)
-        source_slots = day + (elapsed // source_freq) * source_freq
+        source_slots = (day + ((df["date"] - day) // source_freq) * source_freq).rename(
+            "date"
+        )
 
-        duplicates = (df.groupby(source_slots)[closes].count() > 1).sum()
+        source_groups = df.groupby(source_slots)[closes]
+        duplicates = (source_groups.count() > 1).sum()
         duplicates = duplicates[duplicates > 0]
         if not duplicates.empty:
             self.logger.warning(
@@ -205,31 +226,46 @@ class DataProcessor:
                 "используем последнюю цену по времени."
             )
 
+        df = source_groups.last().reset_index()
+
+        day = df["date"].dt.normalize()
+        days = day.drop_duplicates()
         target_freq = pd.Timedelta(minutes=self.interval)
         session_start = day + pd.Timedelta(hours=10)
         session_end = day + pd.Timedelta(hours=18, minutes=50)
 
-        session_elapsed = df["date"] - session_start
         slot_start = (
-            session_start
-            + (session_elapsed // target_freq) * target_freq
+            session_start + ((df["date"] - session_start) // target_freq) * target_freq
         )
         slot_end = slot_start + target_freq
-
-        fits_session = (
-            (slot_start >= session_start)
-            & (slot_end <= session_end)
-        )
+        fits_session = slot_end <= session_end
 
         df = df.loc[fits_session].copy()
         df["date"] = slot_end.loc[fits_session] - pd.Timedelta(seconds=1)
 
-        aligned = df.groupby("date", as_index=False).last()
-        self.logger.info(
-            f"Выравнивание по {self.interval} минут: {len(df)} строк - {len(aligned)} слотов."
+        groups = df.groupby("date")[closes]
+        required = max(
+            1,
+            ceil((self.interval // self.source_interval) * self.min_bar_coverage),
+        )
+        aligned = groups.last().where(groups.count() >= required)
+
+        offsets = pd.timedelta_range(
+            start=pd.Timedelta(hours=10) + target_freq - pd.Timedelta(seconds=1),
+            periods=self.expected_bars_per_day,
+            freq=target_freq,
+        )
+        grid = pd.DatetimeIndex(
+            [d + offset for d in days for offset in offsets],
+            name="date",
         )
 
-        return aligned
+        result = aligned.reindex(grid).reset_index()
+        self.logger.info(
+            f"Агрегация {self.source_interval} → {self.interval} минут: "
+            f"{len(result)} слотов."
+        )
+        return result
 
     @staticmethod
     def _get_tickers_names(df: pd.DataFrame) -> List[str]:
