@@ -35,7 +35,7 @@ def load(config: Config) -> None:
         tickers=data_cfg.tickers,
         start_year=data_cfg.start_year,
         end_year=data_cfg.end_year,
-        interval=data_cfg.interval,
+        interval=data_cfg.source_interval,
         delay=data_cfg.delay,
         save_dir=data_cfg.raw_dir,
         filename=data_cfg.raw_file,
@@ -74,6 +74,7 @@ def process(config: Config) -> None:
         hampel_window=proc_cfg.hampel_window,
         hampel_sigma=proc_cfg.hampel_sigma,
         hampel_const=proc_cfg.hampel_const,
+        source_interval=config.data.source_interval,
         interval=config.data.interval,
     )
 

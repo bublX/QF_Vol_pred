@@ -39,6 +39,7 @@ class DataProcessor:
         hampel_const: float = 1.4826,
         hampel_window: int = 5,
         hampel_sigma: float = 3.0,
+        source_interval: int = 1,
         interval: int = 10,
     ):
         self.input_dir = Path(input_dir)
@@ -53,6 +54,16 @@ class DataProcessor:
         self.logger = Logger("DataProcessor")
 
         self._results = {}
+
+        if (
+            source_interval <= 0
+            or interval < source_interval
+            or interval % source_interval != 0
+        ):
+            raise ValueError(
+                "Итоговый интервал должен быть больше 0 и кратным исходному"
+            )
+        self.source_interval = source_interval
 
     def process_all(
         self, input_file: str = "all_prices.csv"
@@ -110,7 +121,6 @@ class DataProcessor:
         """
 
         ticker_df = self._prepare_data(ticker_df, ticker)
-        ticker_df = self._filter_trading_hours(ticker_df, ticker)
         ticker_df = self._filter_valid_dates(ticker_df, ticker)
         ticker_df = self._filter_within_day(ticker_df, ticker)
         ticker_df = self._calculate_returns(ticker_df, ticker)
@@ -177,17 +187,42 @@ class DataProcessor:
 
         df = df.copy()
         df["date"] = pd.to_datetime(df["date"])
-        df = df.sort_values("date").reset_index(drop=True)
-        freq = pd.Timedelta(minutes=self.interval)
-        df["date"] = df["date"].dt.floor(freq=freq) + freq - pd.Timedelta(seconds=1)
+        df = df.sort_values("date", kind="stable").reset_index(drop=True)
+        df = self._filter_trading_hours(df)
 
         closes = [col for col in df.columns if col.endswith("_close")]
-        duplicates = (df.groupby("date")[closes].count() > 1).sum()
+        day = df["date"].dt.normalize()
+        elapsed = df["date"] - day
+
+        source_freq = pd.Timedelta(minutes=self.source_interval)
+        source_slots = day + (elapsed // source_freq) * source_freq
+
+        duplicates = (df.groupby(source_slots)[closes].count() > 1).sum()
         duplicates = duplicates[duplicates > 0]
         if not duplicates.empty:
             self.logger.warning(
-                f"Найдены дубликаты по слотам: {duplicates.to_dict()}, берем только последнюю."
+                f"Дубликаты исходных свечей: {duplicates.to_dict()}; "
+                "используем последнюю цену по времени."
             )
+
+        target_freq = pd.Timedelta(minutes=self.interval)
+        session_start = day + pd.Timedelta(hours=10)
+        session_end = day + pd.Timedelta(hours=18, minutes=50)
+
+        session_elapsed = df["date"] - session_start
+        slot_start = (
+            session_start
+            + (session_elapsed // target_freq) * target_freq
+        )
+        slot_end = slot_start + target_freq
+
+        fits_session = (
+            (slot_start >= session_start)
+            & (slot_end <= session_end)
+        )
+
+        df = df.loc[fits_session].copy()
+        df["date"] = slot_end.loc[fits_session] - pd.Timedelta(seconds=1)
 
         aligned = df.groupby("date", as_index=False).last()
         self.logger.info(
@@ -290,7 +325,7 @@ class DataProcessor:
 
         weekday = ticker_df["date"].dt.day_of_week < 5
         time = ticker_df["date"].dt.time
-        mask = (time > dt.time(10, 0)) & (time < dt.time(18, 50)) & weekday
+        mask = (time >= dt.time(10, 0)) & (time < dt.time(18, 50)) & weekday
         ticker_df = ticker_df[mask].reset_index(drop=True)
 
         self.logger.info(f"{ticker}: оставлены бары в торговые часы и будние дни")
