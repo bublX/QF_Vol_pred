@@ -114,7 +114,8 @@ def _write_experiment(tmp_path, data_extra=""):
     path.write_text(
         f"""
 model: {{name: rf}}
-data: {{tickers: [AAA, BBB], raw_dir: {tmp_path / "raw"}{data_extra}}}
+data: {{tickers: [AAA, BBB], raw_dir: {tmp_path / "raw"},
+        raw_file: all_prices.csv{data_extra}}}
 processing: {{processed_dir: {tmp_path / "processed"}}}
 """,
         encoding="utf-8",
@@ -169,7 +170,8 @@ def test_load_passes_config_to_data_loader(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     captured = {}
     monkeypatch.setattr(
-        "source.run.DataLoader.load_all", lambda self: captured.update(vars(self))
+        "source.run.DataLoader.load_all",
+        lambda self, **kwargs: captured.update(vars(self), **kwargs),
     )
 
     load(
@@ -186,3 +188,4 @@ def test_load_passes_config_to_data_loader(tmp_path, monkeypatch):
     assert captured["start_year"] == 2019
     assert captured["end_year"] == 2020
     assert captured["save_path"] == tmp_path / "raw" / "all_prices.csv"
+    assert captured["save_individual"] is True
