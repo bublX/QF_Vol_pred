@@ -42,7 +42,7 @@ class DistributionCalculator:
             или таблица с числовыми столбцами и уникальными названиями.
         """
         return data.replace([np.inf, -np.inf], np.nan)
-    
+
     def calculate(self, data: pd.Series | pd.DataFrame) -> pd.DataFrame:
         """
         Рассчет статистик отдельно для каждого числового столбца.
@@ -100,6 +100,8 @@ class DistributionCalculator:
         kde: bool = True,
         title: str = "",
         xlabel: str = "",
+        stat: str = "density",
+        binrange: tuple[float, float] | None = None,
     ) -> Figure:
         """
         Построение гистограммы плотности распределения случайной величины.
@@ -137,17 +139,31 @@ class DistributionCalculator:
 
         fig, ax = plt.subplots(figsize=(10, 6))
         sns.histplot(
-            x=values, bins=bins, stat="density", kde=kde and values.nunique() > 1, ax=ax
+            x=values,
+            bins=bins,
+            binrange=binrange,
+            stat=stat,
+            kde=kde and values.nunique() > 1,
+            element="bars",
+            shrink=0.95,
+            color="steelblue",
+            edgecolor="gray",
+            linewidth=0.4,
+            ax=ax,
         )
         ax.set_title(title)
         ax.set_xlabel(xlabel or str(data.name or "Value"))
-        ax.set_ylabel("Density")
+        ax.set_ylabel({
+            "density": "Плотность",
+            "count": "Количество наблюдений",
+            "percent": "Доля наблюдений, %",
+        }.get(stat, stat))
         ax.grid(axis="y", alpha=0.25)
         fig.tight_layout()
         return fig
 
     def plot_qq(
-        self, data: pd.Series, title: str = "Q-Q plot", ylabel: str = ""
+        self, data: pd.Series | pd.DataFrame, title: str = "Q-Q plot", ylabel: str = ""
     ) -> Figure:
         """
         Сравнение квантилей ряда с нормальным распределением.
