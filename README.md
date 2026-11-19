@@ -34,13 +34,16 @@ uv run ruff format .    # форматирование
 
 Все команды запускаются из корня проекта.
 
+Комплектный архив минутных цен хранится в `data/archives/1m_2014_2025/`.
+Сначала распакуйте его по [инструкции по данным](data/README.md); повторное скачивание не требуется.
+
 ```bash
-uv run python main.py --config configs/har.yaml --stage load     # загрузка цен с MOEX -> data/raw/
-uv run python main.py --config configs/har.yaml --stage process  # очистка и расчет RV -> data/processed/
+uv run python main.py --config configs/har.yaml --stage process  # -> data/processed/10m_default_2014_2025/
 uv run python main.py --config configs/har.yaml                  # обучение (stage train) -> reports/tables/har_results.csv
 ```
 
-Этапы `load` и `process` нужно выполнить один раз; дальше можно обучать любые модели.
+Для скачивания другого набора настройте секцию `data` и выполните `--stage load`.
+Этап `process` выполняется для каждого варианта обработки; затем его данные могут использовать разные модели.
 
 Готовые эксперименты: `configs/har.yaml`, `rf.yaml`, `xgb.yaml`, `lgbm.yaml`.
 Все значения по умолчанию лежат в `configs/default.yaml`
@@ -88,17 +91,14 @@ QF_Vol_pred/
 │
 ├── tests/                           # Тесты (uv run pytest)
 │
-├── data/                            # Данные (не коммитятся)
-│   ├── raw/                         # Сырые данные
-│   │   └── all_prices.csv           # Цены от DataLoader
-│   │
-│   └── processed/                   # Обработанные данные
-│       ├── RV/                      # RV по каждому тикеру
-│       │   ├── SBER_RV.csv
-│       │   ├── VTBR_RV.csv
-│       │   └── ...
-│       ├── rv_matrix.csv            # Все RV в одной таблице
-│       └── profit_matrix.csv        # Все доходности
+├── data/
+│   ├── README.md                    # Подготовка и описание структуры
+│   ├── archives/1m_2014_2025/       # Исходный ZIP (в Git)
+│   ├── raw/1m_2014_2025/            # Распакованные минутные цены (локально)
+│   └── processed/                   # Производные наборы (локально)
+│       ├── 10m_default_2014_2025/   # Стандартная обработка
+│       ├── 5m_2014_2025/            # configs/har_5m.yaml
+│       └── 10m_2014_2025/           # configs/har_10m.yaml
 │       
 │
 ├── notebooks/                       # Jupyter ноутбуки

@@ -21,7 +21,7 @@ processing:
   hampel_window: 5
   hampel_sigma: 3.0
   hampel_const: 1.4826
-  processed_dir: data/processed/
+  processed_dir: data/processed/10m_default_2014_2025/
 
 features:
   feature_set: full  # full | har (только rv_1, rv_5, rv_22)

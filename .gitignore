@@ -7,7 +7,9 @@ venv/
 .venv/
 .pytest_cache/
 .coverage
-data/
+/data/*
+!/data/README.md
+!/data/archives/
 *.csv
 *.xlsx
 *.parquet
