@@ -9,7 +9,7 @@ def test_aggregation_and_source_duplicates(tmp_path, monkeypatch, with_duplicate
     monkeypatch.chdir(tmp_path)
     processor = DataProcessor(source_interval=1, interval=5)
     warnings = []
-    monkeypatch.setattr(processor.logger, "warning", warnings.append)
+    monkeypatch.setattr(processor.aggregator.logger, "warning", warnings.append)
 
     raw = pd.DataFrame(
         {

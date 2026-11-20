@@ -1,7 +1,7 @@
 import pandas as pd
 import numpy as np
-import datetime as dt
 from source.utils.logger import Logger
+from source.data_processors.bar_aggregator import BarAggregator
 from typing import Tuple, List, Dict
 from pathlib import Path
 from math import ceil
@@ -17,8 +17,13 @@ class DataProcessor:
         Директория для чтения
     output_dir : str
         Директория для сохранения
-    min_bars_per_day : int
-        Минимальное допустимое число сделок в день
+    min_day_coverage : float
+        Минимальная доля заполненных итоговых баров за сессию,
+        до заполнения пропусков. Значение в диапазоне (0, 1].
+    min_bar_coverage : float
+        Минимальная доля исходных свечей внутри итогового бара.
+        Значение в диапазоне [0, 1]. Даже при 0 требуется
+        хотя бы одна исходная свеча.
     max_return : float
         Максимальное допустимое значение доходностей в процентах
     hampel_const : float
@@ -27,8 +32,33 @@ class DataProcessor:
         Полуширина окна в барах
     hampel_sigma : float
         Порог для фильтра в сигмах
+    source_interval : int
+        Длительность исходных свечей в минутах
     interval : int
-        Интервал длины свечи в минутах
+        Интервал желаемой длины свечи в минутах.
+        Должен быть кратным source_interval.
+    session_start : str
+        Начало сессии в формате HH:MM, включительно.
+        Должно совпадать с сеткой исходных свечей.
+    session_end : str
+        Конец сессии в формате HH:MM, невключительно.
+        Должен быть позже session_start в пределах одного дня.
+
+    Raises
+    ------
+    ValueError
+        Некорректные интервалы, границы сессии или доли покрытия.
+        Также возникает, если в сессии помещается меньше двух
+        полных итоговых баров.
+
+    Notes
+    -----
+    Агрегация выполняется через BarAggregator. Неполный последний
+    интервал сессии отбрасывается.
+
+    Минимальное число заполненных баров за день вычисляется как
+    max(2, ceil(expected_bars_per_day * min_day_coverage)).
+    Количество баров определяется границами сессии и interval.
     """
 
     def __init__(
@@ -43,6 +73,8 @@ class DataProcessor:
         hampel_sigma: float = 3.0,
         source_interval: int = 1,
         interval: int = 10,
+        session_start: str = "10:00",
+        session_end: str = "18:50",
     ):
         self.input_dir = Path(input_dir)
         self.output_dir = Path(output_dir)
@@ -50,37 +82,29 @@ class DataProcessor:
         self.hampel_const = hampel_const
         self.hampel_window = hampel_window
         self.hampel_sigma = hampel_sigma
-        self.interval = interval
         self.missing_days = {}
         self.logger = Logger("DataProcessor")
 
         self._results = {}
 
-        if (
-            source_interval <= 0
-            or interval < source_interval
-            or interval % source_interval != 0
-        ):
-            raise ValueError(
-                "Итоговый интервал должен быть больше 0 и кратным исходному"
-            )
-        self.source_interval = source_interval
+        self.aggregator = BarAggregator(
+            source_interval=source_interval,
+            interval=interval,
+            min_bar_coverage=min_bar_coverage,
+            session_start=session_start,
+            session_end=session_end,
+        )
+
         if not 0 < min_day_coverage <= 1:
             raise ValueError("min_day_coverage должен быть в диапазоне (0, 1]")
 
-        session_minutes = 8 * 60 + 50
-        expected_bars = session_minutes // interval
+        expected_bars = self.aggregator.expected_bars_per_day
         if expected_bars < 2:
             raise ValueError("Для расчёта RV нужны хотя бы два бара за сессию")
 
         self.expected_bars_per_day = expected_bars
         self.min_day_coverage = min_day_coverage
         self.min_bars_per_day = max(2, ceil(expected_bars * min_day_coverage))
-
-        if not 0 <= min_bar_coverage <= 1:
-            raise ValueError("min_bar_coverage должен быть в диапазоне [0, 1]")
-
-        self.min_bar_coverage = min_bar_coverage
 
     def process_all(
         self, input_file: str = "all_prices.csv"
@@ -184,7 +208,7 @@ class DataProcessor:
 
     def _align_to_slots(self, df: pd.DataFrame) -> pd.DataFrame:
         """
-        Выровнять свечи тикеров по слотам интервала (например, 10 минут): одна строка на слот.
+        Агрегирование исходных цен через BarAggregator
 
         Parameters
         ----------
@@ -201,71 +225,7 @@ class DataProcessor:
         Если у тикера в слоте несколько свечей, то берется последняя по времени:
         её close будет считаться ценой закрытия слота.
         """
-
-        df = df.copy()
-        df["date"] = pd.to_datetime(df["date"])
-        df = df.sort_values("date", kind="stable").reset_index(drop=True)
-        df = self._filter_trading_hours(df)
-
-        closes = [col for col in df.columns if col.endswith("_close")]
-        if df.empty:
-            return df[["date", *closes]]
-
-        day = df["date"].dt.normalize()
-        source_freq = pd.Timedelta(minutes=self.source_interval)
-        source_slots = (day + ((df["date"] - day) // source_freq) * source_freq).rename(
-            "date"
-        )
-
-        source_groups = df.groupby(source_slots)[closes]
-        duplicates = (source_groups.count() > 1).sum()
-        duplicates = duplicates[duplicates > 0]
-        if not duplicates.empty:
-            self.logger.warning(
-                f"Дубликаты исходных свечей: {duplicates.to_dict()}; "
-                "используем последнюю цену по времени."
-            )
-
-        df = source_groups.last().reset_index()
-
-        day = df["date"].dt.normalize()
-        days = day.drop_duplicates()
-        target_freq = pd.Timedelta(minutes=self.interval)
-        session_start = day + pd.Timedelta(hours=10)
-        session_end = day + pd.Timedelta(hours=18, minutes=50)
-
-        slot_start = (
-            session_start + ((df["date"] - session_start) // target_freq) * target_freq
-        )
-        slot_end = slot_start + target_freq
-        fits_session = slot_end <= session_end
-
-        df = df.loc[fits_session].copy()
-        df["date"] = slot_end.loc[fits_session] - pd.Timedelta(seconds=1)
-
-        groups = df.groupby("date")[closes]
-        required = max(
-            1,
-            ceil((self.interval // self.source_interval) * self.min_bar_coverage),
-        )
-        aligned = groups.last().where(groups.count() >= required)
-
-        offsets = pd.timedelta_range(
-            start=pd.Timedelta(hours=10) + target_freq - pd.Timedelta(seconds=1),
-            periods=self.expected_bars_per_day,
-            freq=target_freq,
-        )
-        grid = pd.DatetimeIndex(
-            [d + offset for d in days for offset in offsets],
-            name="date",
-        )
-
-        result = aligned.reindex(grid).reset_index()
-        self.logger.info(
-            f"Агрегация {self.source_interval} → {self.interval} минут: "
-            f"{len(result)} слотов."
-        )
-        return result
+        return self.aggregator.transform(df)
 
     @staticmethod
     def _get_tickers_names(df: pd.DataFrame) -> List[str]:
@@ -336,35 +296,6 @@ class DataProcessor:
         self.logger.info(
             f"{ticker}: данные подготовлены (дата преобразована, отсортировано)"
         )
-        return ticker_df
-
-    def _filter_trading_hours(
-        self, ticker_df: pd.DataFrame, ticker: str = ""
-    ) -> pd.DataFrame:
-        """
-        Оставить только бары в торговые часы (10:00–18:50) и только будние дни.
-
-        Parameters
-        ----------
-        ticker_df : pd.DataFrame
-            Данные тикера
-        ticker : str
-            Название тикера
-
-        Returns
-        -------
-        pd.DataFrame
-            Отфильтрованный DataFrame
-        """
-
-        ticker_df = ticker_df.copy()
-
-        weekday = ticker_df["date"].dt.day_of_week < 5
-        time = ticker_df["date"].dt.time
-        mask = (time >= dt.time(10, 0)) & (time < dt.time(18, 50)) & weekday
-        ticker_df = ticker_df[mask].reset_index(drop=True)
-
-        self.logger.info(f"{ticker}: оставлены бары в торговые часы и будние дни")
         return ticker_df
 
     def _filter_valid_dates(

@@ -22,6 +22,8 @@ processing:
   hampel_window: 5
   hampel_sigma: 3.0
   hampel_const: 1.4826
+  session_start: "10:00"
+  session_end: "18:50"
   processed_dir: data/processed/10m_default_2014_2025/
 
 features:

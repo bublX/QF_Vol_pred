@@ -98,6 +98,8 @@ def process(config: Config) -> None:
         hampel_const=proc_cfg.hampel_const,
         source_interval=config.data.source_interval,
         interval=config.data.interval,
+        session_start=proc_cfg.session_start,
+        session_end=proc_cfg.session_end,
     )
 
     processor.process_all(config.data.raw_file)

@@ -48,6 +48,8 @@ class ProcessingConfig:
     hampel_sigma: float
     hampel_const: float
     processed_dir: str
+    session_start: str
+    session_end: str
 
 
 @dataclass
