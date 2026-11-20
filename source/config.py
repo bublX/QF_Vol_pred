@@ -26,6 +26,7 @@ class DataConfig:
     tickers: list[str]
     start_year: int
     end_year: int
+    archive_path: str
     source_interval: int
     interval: int
     delay: float

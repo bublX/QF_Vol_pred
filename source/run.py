@@ -7,6 +7,7 @@ import pandas as pd
 from source.config import Config, load_config
 from source.data_processors.data_loader import DataLoader
 from source.data_processors.data_processor import DataProcessor
+from source.data_processors.dataset_preparer import DatasetPreparer
 from source.features.data_splitter import DataSplitter
 from source.features.features_engineering import FeatureEngineer
 from source.models.registry import get_model
@@ -14,6 +15,26 @@ from source.utils.logger import Logger
 from source.utils.metrics import MetricsCalculator
 
 COMMAND = "uv run python main.py --config <конфиг>"
+
+
+def prepare(config: Config) -> None:
+    """
+    Подготовить CSV из архива данных.
+
+    Parameters
+    ----------
+    config : Config
+        Конфиг эксперимента
+    """
+    data_cfg = config.data
+    preparer = DatasetPreparer(
+        archive_path=data_cfg.archive_path,
+        output_path=Path(data_cfg.raw_dir) / data_cfg.raw_file,
+        tickers=data_cfg.tickers,
+    )
+    path = preparer.prepare()
+    logger = Logger("DatasetPreparer")
+    logger.success(f"Данные готовы: {path}")
 
 
 def load(config: Config) -> None:
@@ -212,14 +233,14 @@ def main() -> None:
     )
     parser.add_argument(
         "--stage",
-        choices=["load", "process", "train"],
+        choices=["prepare", "load", "process", "train"],
         default="train",
         help="Этап пайплайна (по умолчанию train)",
     )
     args = parser.parse_args()
 
     config = load_config(args.config)
-    stages = {"load": load, "process": process, "train": run}
+    stages = {"prepare": prepare, "load": load, "process": process, "train": run}
     try:
         stages[args.stage](config)
     except FileNotFoundError as error:

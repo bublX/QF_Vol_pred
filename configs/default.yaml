@@ -7,6 +7,7 @@ data:
   tickers: [ VTBR, SBER, LKOH, ROSN, NVTK, TATN, GAZP, GMKN, NLMK, MGNT ]
   start_year: 2014
   end_year: 2025
+  archive_path: data/archives/1m_2014_2025/prices_1m_2014_2025.zip
   source_interval : 1
   interval: 10
   delay: 0
