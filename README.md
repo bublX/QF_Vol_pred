@@ -41,10 +41,14 @@ uv run ruff format .    # форматирование
 существует, он проверяется и используется повторно. Повторное скачивание не требуется.
 Описание исходника и ручная распаковка — в [инструкции по данным](data/README.md).
 
+В командах замените `<experiment>` именем выбранного YAML-файла из `configs/`.
+Имена файлов и параметры экспериментов могут меняться; общие значения
+наследуются из `configs/default.yaml`.
+
 ```bash
-uv run python main.py --config configs/har_5m.yaml --stage prepare  # -> data/raw/1m_2014_2025/prices_1m_2014_2025.csv
-uv run python main.py --config configs/har_5m.yaml --stage process  # -> data/processed/5m_2014_2025/
-uv run python main.py --config configs/har_5m.yaml                  # stage train -> reports/tables/har_5m_2014_2025_results.csv
+uv run python main.py --config "configs/<experiment>.yaml" --stage prepare  # -> data.raw_dir / data.raw_file
+uv run python main.py --config "configs/<experiment>.yaml" --stage process  # -> processing.processed_dir
+uv run python main.py --config "configs/<experiment>.yaml"                  # stage train -> output.reports_dir / <output.name>_results.csv
 ```
 
 Для скачивания другого набора настройте секцию `data` и выполните `--stage load`.
@@ -54,12 +58,15 @@ uv run python main.py --config configs/har_5m.yaml                  # stage trai
 Этап `process` выполняется для каждого варианта обработки; затем его данные могут использовать разные модели.
 Обучение по умолчанию не запускает `prepare`, `load` или `process` автоматически.
 
-Готовые эксперименты: `configs/har.yaml`, `rf.yaml`, `xgb.yaml`, `lgbm.yaml`,
-а также `har_5m.yaml` и `har_10m.yaml` для разных вариантов подготовки данных.
 Все значения по умолчанию лежат в `configs/default.yaml`.
 Файл эксперимента переопределяет только то, что отличается:
 вложенные словари объединяются, списки заменяются целиком.
-Новый эксперимент — новый YAML-файл в `configs/`.
+Новый эксперимент — новый YAML-файл в `configs/` с обязательным `model.name`
+(`har`, `rf`, `xgb` или `lgbm`). Для HAR выберите `features.feature_set: har`.
+Для HAR и RF задайте `split.use_validation: false`, `split.valid_end: null`
+и границу обучения `split.train_end`; для XGBoost и LightGBM можно использовать
+стандартную схему с валидацией и refit.
+Поле `output.name` задаёт имя результата; если оно не задано, используется имя модели.
 Новая модель — класс в `source/models/` и строка в `MODELS` в `source/models/registry.py`.
 
 ## Настройка обработки данных
@@ -74,7 +81,10 @@ uv run python main.py --config configs/har_5m.yaml                  # stage trai
 `HH:MM`: начало включается, конец не включается. Учитываются будние дни.
 Бары отсчитываются от начала сессии; последний неполный бар отбрасывается.
 Ценой бара становится последнее непустое значение `close` каждого тикера.
-В `har_5m.yaml` используется сессия 10:00–18:40, по умолчанию — 10:00–18:50.
+Стандартные границы сессии заданы в `configs/default.yaml`; эксперимент может
+переопределить их. Для сравнения интервалов явно согласуйте границы сессии,
+доли покрытия и фильтры. Одинаковое окно в барах охватывает разное время
+при разных длительностях бара.
 
 Параметры покрытия решают разные задачи:
 
@@ -145,6 +155,19 @@ processing:
 Для сравнения вариантов задавайте разные `processed_dir` и `output.name`.
 После изменения интервала, сессии или шагов обработки выполните `process`, затем `train`.
 
+### Запуск нескольких моделей
+
+Если несколько конфигов используют одинаковые исходные данные, интервал,
+границы сессии и все параметры обработки, выполните `process` один раз
+с любым из них. Затем запускайте обучение с каждым конфигом отдельно.
+Все эти конфиги должны указывать один `processing.processed_dir`,
+а для разных результатов следует задать разные `output.name`.
+
+При сравнении двух интервалов подготовьте отдельный каталог данных для каждого,
+выполните две обработки и обучите модели на соответствующих наборах. Обучение
+читает готовый CSV и не сверяет его происхождение с текущими параметрами конфига,
+поэтому после изменения обработки нужно заново выполнить `process`.
+
 ### Добавление обработчика
 
 1. Создайте класс-наследник `ProcessingStep` в `source/data_processors/steps/`
@@ -163,7 +186,7 @@ QF_Vol_pred/
 │
 ├── configs/                         # YAML-конфиги экспериментов
 │   ├── default.yaml                 # Все значения по умолчанию
-│   └── har.yaml, rf.yaml, ...       # Эксперименты (только отличия)
+│   └── <experiment>.yaml           # Эксперименты (только отличия)
 │
 ├── source/                          # Главная папка с исходным кодом
 │   ├── config.py                    # Загрузка и проверка конфигов
@@ -210,10 +233,7 @@ QF_Vol_pred/
 │   ├── archives/1m_2014_2025/       # Исходный ZIP (в Git)
 │   ├── raw/1m_2014_2025/            # Распакованные минутные цены (локально)
 │   └── processed/                   # Производные наборы (локально)
-│       ├── 10m_default_2014_2025/   # Стандартная обработка
-│       ├── 5m_2014_2025/            # configs/har_5m.yaml
-│       └── 10m_2014_2025/           # configs/har_10m.yaml
-│       
+│       └── <dataset>/              # Каталог из processing.processed_dir
 │
 ├── notebooks/                       # Jupyter ноутбуки
 │   ├── 00_test_pipeline.ipynb       # Проверка загрузки
