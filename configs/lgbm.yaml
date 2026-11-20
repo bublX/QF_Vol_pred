@@ -1,5 +1,0 @@
-model:
-  name: lgbm
-  params:
-    n_estimators: 1000
-    max_depth: 31

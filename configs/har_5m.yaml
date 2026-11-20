@@ -5,10 +5,11 @@ features:
   feature_set: har
 
 data:
+  source_interval: 1
   interval: 5
 
 processing:
-  processed_dir: data/processed/5m_2014_2025/
+  processed_dir: data/processed/control_5m_2014_2025/
   session_start: "10:00"
   session_end: "18:40"
 
@@ -18,4 +19,4 @@ split:
   use_validation: false
 
 output:
-  name: har_5m_2014_2025
+  name: har_5m_control_2014_2025

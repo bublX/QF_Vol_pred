@@ -1,0 +1,22 @@
+model:
+  name: rf
+  params:
+    n_estimators: 100
+    max_depth: 10
+
+data:
+  source_interval: 1
+  interval: 10
+
+processing:
+  processed_dir: data/processed/control_10m_2014_2025/
+  session_start: "10:00"
+  session_end: "18:40"
+
+split:
+  train_end: '2023-12-31'
+  valid_end: null
+  use_validation: false
+
+output:
+  name: rf_10m_control_2014_2025

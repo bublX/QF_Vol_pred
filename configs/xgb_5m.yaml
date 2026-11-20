@@ -1,0 +1,23 @@
+model:
+  name: xgb
+  params:
+    n_estimators: 1000
+    max_depth: 6
+
+data:
+  source_interval: 1
+  interval: 5
+
+processing:
+  processed_dir: data/processed/control_5m_2014_2025/
+  session_start: "10:00"
+  session_end: "18:40"
+
+split:
+  train_end: '2021-12-31'
+  valid_end: '2023-12-31'
+  use_validation: true
+  refit: true
+
+output:
+  name: xgb_5m_control_2014_2025

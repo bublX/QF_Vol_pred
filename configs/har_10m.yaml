@@ -4,17 +4,14 @@ model:
 features:
   feature_set: har
 
+data:
+  source_interval: 1
+  interval: 10
+
 processing:
-  processed_dir: data/processed/10m_2014_2025/
-  steps:
-  - name: hampel
-    params:
-      window_size: 10
-      sigma: 3.0
-      const: 1.4826
-  - name: clip
-    params:
-      max_return: 5
+  processed_dir: data/processed/control_10m_2014_2025/
+  session_start: "10:00"
+  session_end: "18:40"
 
 split:
   train_end: '2023-12-31'
@@ -22,4 +19,4 @@ split:
   use_validation: false
 
 output:
-  name: har_10m_2014_2025
+  name: har_10m_control_2014_2025
