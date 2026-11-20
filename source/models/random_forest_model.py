@@ -6,9 +6,11 @@ from source.models.base import BaseModel
 
 class RandomForestModel(BaseModel):
     """
-    Random Forest для прогнозирования RV.
+    Random Forest для прогнозирования волатильности sqrt(RV) в текущем пайплайне.
 
     Наследует BaseModel. Реализует fit/predict для RandomForestRegressor.
+    Обучается на переданном y и возвращает прогнозы в его шкале;
+    преобразование таргета выполняется вне модели.
 
     Parameters
     ----------

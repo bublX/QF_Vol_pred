@@ -7,9 +7,12 @@ from source.autoregression.base_ar import BaseARModel
 
 class HARModel(BaseARModel):
     """
-    HAR-модель для прогнозирования RV. Наследует BaseARModel.
+    HAR-модель для прогнозирования волатильности sqrt(RV) в текущем пайплайне.
+    Наследует BaseARModel.
 
     Реализует fit/predict для HAR.
+    Обучается на переданном y и возвращает прогнозы в его шкале;
+    преобразование таргета выполняется вне модели.
     """
 
     def __init__(self, lags: List[int] = [1, 5, 22]):

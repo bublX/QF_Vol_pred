@@ -20,7 +20,7 @@ class DataLoader:
     end_year : int
         Конечный год
     interval : int
-        Интервал между сделками
+        Код интервала свечей MOEX ISS
     delay : float
         Пауза между HTTP-запросами
     save_dir : str

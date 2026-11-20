@@ -7,10 +7,12 @@ from source.models.base import BaseModel
 
 class XGBoostModel(BaseModel):
     """
-    XGBoost для прогнозирования RV.
+    XGBoost для прогнозирования волатильности sqrt(RV) в текущем пайплайне.
 
     Наследует BaseModel. Реализует fit/predict для XGBRegressor.
     Поддерживает early stopping через eval_set.
+    Обучается на переданном y и возвращает прогнозы в его шкале;
+    преобразование таргета выполняется вне модели.
 
     Parameters
     ----------

@@ -11,7 +11,7 @@ from scipy.stats import skew
 
 class FeatureEngineer:
     """
-    Генератор признаков для моделей прогнозирования RV.
+    Генератор признаков из RV для прогнозирования волатильности sqrt(RV).
 
     Parameters
     ----------
@@ -32,6 +32,10 @@ class FeatureEngineer:
     -----
     Признаки генерируются для каждого тикера отдельно.
     Все признаки имеют префикс {ticker}_.
+    HAR-признаки rv_1, rv_5 и rv_22 рассчитываются как корни из RV
+    и её средних за 5 и 22 наблюдения; остальные признаки строятся
+    из ряда RV без предварительного извлечения корня.
+    create_targets формирует sqrt(RV) следующего наблюдения ряда.
     """
 
     def __init__(
@@ -119,7 +123,7 @@ class FeatureEngineer:
 
     def _create_har_features(self, ticker_rv: pd.Series, ticker: str) -> pd.DataFrame:
         """
-        Создать HAR-признаки.
+        Создать HAR-признаки: sqrt(RV) и корни из средних RV за 5 и 22 наблюдения.
 
         Parameters
         ----------
