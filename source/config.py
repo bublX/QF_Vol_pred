@@ -129,6 +129,23 @@ class Config:
     output: OutputConfig
 
 
+def _validate_step_config(item: dict[str, Any], path: str) -> None:
+    """Проверить формат описания шага без создания обработчика."""
+    unknown = set(item) - {"name", "params"}
+    if unknown:
+        raise ValueError(f"{path}: неизвестные ключи {list(unknown)}")
+
+    name = item.get("name")
+    if not isinstance(name, str) or not name.strip():
+        raise ValueError(f"{path}.name: требуется непустая строка")
+
+    params = item.get("params")
+    if params is not None:
+        if not isinstance(params, dict):
+            raise ValueError(f"{path}.params: требуется словарь или null")
+        if not all(isinstance(key, str) for key in params):
+            raise ValueError(f"{path}.params: названия параметров должны быть строками")
+        
 def load_config(
     path: str | Path, default_path: str | Path = DEFAULT_CONFIG_PATH
 ) -> Config:
@@ -164,6 +181,12 @@ def load_config(
 
     values = _deep_merge(_read_yaml(Path(default_path)), _read_yaml(Path(path)))
     config = _build(Config, values, "")
+
+    for section in ("price_steps", "steps"):
+        for index, item in enumerate(getattr(config.processing, section)):
+            _validate_step_config(item, f"processing.{section}[{index}]")
+
+    _validate_step_config(config.processing.returns, "processing.returns")
 
     if config.model.name is None:
         raise ValueError("'model.name' не задан: укажите модель в файле эксперимента")

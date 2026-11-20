@@ -153,11 +153,13 @@ class DistributionCalculator:
         )
         ax.set_title(title)
         ax.set_xlabel(xlabel or str(data.name or "Value"))
-        ax.set_ylabel({
-            "density": "Плотность",
-            "count": "Количество наблюдений",
-            "percent": "Доля наблюдений, %",
-        }.get(stat, stat))
+        ax.set_ylabel(
+            {
+                "density": "Плотность",
+                "count": "Количество наблюдений",
+                "percent": "Доля наблюдений, %",
+            }.get(stat, stat)
+        )
         ax.grid(axis="y", alpha=0.25)
         fig.tight_layout()
         return fig

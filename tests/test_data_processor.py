@@ -1,9 +1,11 @@
 import pandas as pd
 import pytest
+import numpy as np
 
+from source.data_processors.steps.fill import ForwardFillWithinDay
 from source.data_processors.data_processor import DataProcessor
 from source.data_processors.steps.returns import LogReturns
-
+from source.data_processors.steps.clip import ClipReturns
 
 @pytest.mark.parametrize("with_duplicate", [False, True])
 def test_aggregation_and_source_duplicates(tmp_path, monkeypatch, with_duplicate):
@@ -105,3 +107,98 @@ def test_day_coverage_depends_on_interval(tmp_path, monkeypatch, interval, requi
     assert processor.missing_days["AAA"].to_dict() == {
         pd.Timestamp("2024-01-10").date(): required - 1,
     }
+
+
+@pytest.mark.parametrize("use_fill", [False, True])
+def test_pipeline_with_optional_forward_fill(tmp_path, monkeypatch, use_fill):
+    monkeypatch.chdir(tmp_path)
+
+    dates = pd.DatetimeIndex([
+        *pd.date_range("2024-01-09 10:09:59", periods=4, freq="10min"),
+        *pd.date_range("2024-01-10 10:09:59", periods=4, freq="10min"),
+    ])
+    data = pd.DataFrame({
+        "date": dates,
+        "close": [100, np.nan, 121, 133.1, np.nan, 200, 220, 242],
+    })
+    original = data.copy(deep=True)
+
+    processor = DataProcessor(
+        interval=10,
+        session_start="10:00",
+        session_end="10:40",
+        min_day_coverage=0.75,
+        price_steps=[ForwardFillWithinDay()] if use_fill else [],
+        returns_calculator=LogReturns(),
+        steps=[],
+    )
+    result = processor.process_ticker(data, "AAA")
+
+    if use_fill:
+        positions = [1, 2, 3, 6, 7]
+        ratios = [1, 1.21, 1.1, 1.1, 1.1]
+    else:
+        positions = [3, 6, 7]
+        ratios = [1.1, 1.1, 1.1]
+
+    assert result["date"].tolist() == dates.take(positions).tolist()
+    np.testing.assert_allclose(result["returns"], np.log(ratios) * 100)
+    pd.testing.assert_frame_equal(data, original)
+
+
+def test_day_coverage_is_checked_before_filling(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+
+    dates = pd.DatetimeIndex([
+        *pd.date_range("2024-01-09 10:09:59", periods=4, freq="10min"),
+        *pd.date_range("2024-01-10 10:09:59", periods=4, freq="10min"),
+    ])
+    data = pd.DataFrame({
+        "date": dates,
+        "close": [100, 110, 121, 133.1, 200, np.nan, np.nan, 242],
+    })
+
+    processor = DataProcessor(
+        interval=10,
+        session_start="10:00",
+        session_end="10:40",
+        min_day_coverage=0.75,
+        price_steps=[ForwardFillWithinDay()],
+        returns_calculator=LogReturns(),
+        steps=[],
+    )
+    result = processor.process_ticker(data, "AAA")
+
+    assert result["date"].tolist() == dates.take([1, 2, 3]).tolist()
+    assert processor.missing_days["AAA"].to_dict() == {
+        pd.Timestamp("2024-01-10").date(): 2,
+    }
+
+
+@pytest.mark.parametrize(
+    "max_return, expected",
+    [(None, np.log(1.1) * 100), (2, 2), (5, 5)],
+)
+def test_pipeline_with_optional_clipping(tmp_path, monkeypatch, max_return, expected):
+    monkeypatch.chdir(tmp_path)
+
+    dates = pd.date_range("2024-01-09 10:09:59", periods=4, freq="10min")
+    data = pd.DataFrame({
+        "date": dates,
+        "close": [100, 110, 100, 110],
+    })
+
+    processor = DataProcessor(
+        session_start="10:00",
+        session_end="10:40",
+        price_steps=[],
+        returns_calculator=LogReturns(),
+        steps=[] if max_return is None else [ClipReturns(max_return=max_return)],
+    )
+    result = processor.process_ticker(data, "AAA")
+
+    assert result["date"].tolist() == dates[1:].tolist()
+    assert result["close"].tolist() == [110, 100, 110]
+    np.testing.assert_allclose(
+        result["returns"], [expected, -expected, expected]
+    )
