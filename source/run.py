@@ -8,6 +8,7 @@ from source.config import Config, load_config
 from source.data_processors.data_loader import DataLoader
 from source.data_processors.data_processor import DataProcessor
 from source.data_processors.dataset_preparer import DatasetPreparer
+from source.data_processors.steps.registry import get_step
 from source.features.data_splitter import DataSplitter
 from source.features.features_engineering import FeatureEngineer
 from source.models.registry import get_model
@@ -87,19 +88,17 @@ def process(config: Config) -> None:
         )
 
     proc_cfg = config.processing
+    steps = [get_step(item["name"], item.get("params")) for item in proc_cfg.steps]
     processor = DataProcessor(
         input_dir=config.data.raw_dir,
         output_dir=proc_cfg.processed_dir,
         min_day_coverage=proc_cfg.min_day_coverage,
         min_bar_coverage=proc_cfg.min_bar_coverage,
-        max_return=proc_cfg.max_return,
-        hampel_window=proc_cfg.hampel_window,
-        hampel_sigma=proc_cfg.hampel_sigma,
-        hampel_const=proc_cfg.hampel_const,
         source_interval=config.data.source_interval,
         interval=config.data.interval,
         session_start=proc_cfg.session_start,
         session_end=proc_cfg.session_end,
+        steps=steps,
     )
 
     processor.process_all(config.data.raw_file)

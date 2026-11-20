@@ -43,13 +43,10 @@ class ProcessingConfig:
 
     min_day_coverage: float
     min_bar_coverage: float
-    max_return: float
-    hampel_window: int
-    hampel_sigma: float
-    hampel_const: float
     processed_dir: str
     session_start: str
     session_end: str
+    steps: list[dict[str, Any]]
 
 
 @dataclass

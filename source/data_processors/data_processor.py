@@ -2,6 +2,9 @@ import pandas as pd
 import numpy as np
 from source.utils.logger import Logger
 from source.data_processors.bar_aggregator import BarAggregator
+from source.data_processors.steps.base import ProcessingStep
+from source.data_processors.steps.hampel import HampelFilter
+from source.data_processors.steps.clip import ClipReturns
 from typing import Tuple, List, Dict
 from pathlib import Path
 from math import ceil
@@ -24,14 +27,6 @@ class DataProcessor:
         Минимальная доля исходных свечей внутри итогового бара.
         Значение в диапазоне [0, 1]. Даже при 0 требуется
         хотя бы одна исходная свеча.
-    max_return : float
-        Максимальное допустимое значение доходностей в процентах
-    hampel_const : float
-        Константа для фильтра Хампеля
-    hampel_window : int
-        Полуширина окна в барах
-    hampel_sigma : float
-        Порог для фильтра в сигмах
     source_interval : int
         Длительность исходных свечей в минутах
     interval : int
@@ -43,7 +38,9 @@ class DataProcessor:
     session_end : str
         Конец сессии в формате HH:MM, невключительно.
         Должен быть позже session_start в пределах одного дня.
-
+    steps : list[ProcessingStep] | None
+        Дополнительные шаги обработки доходностей в порядке выполнения.
+        None и пустой список отключают дополнительные шаги.
     Raises
     ------
     ValueError
@@ -67,21 +64,14 @@ class DataProcessor:
         output_dir: str = "data/processed/",
         min_day_coverage: float = 0.75,
         min_bar_coverage: float = 0.0,
-        max_return: float = 5.0,
-        hampel_const: float = 1.4826,
-        hampel_window: int = 5,
-        hampel_sigma: float = 3.0,
         source_interval: int = 1,
         interval: int = 10,
         session_start: str = "10:00",
         session_end: str = "18:50",
+        steps: list[ProcessingStep] | None = None,
     ):
         self.input_dir = Path(input_dir)
         self.output_dir = Path(output_dir)
-        self.max_return = max_return
-        self.hampel_const = hampel_const
-        self.hampel_window = hampel_window
-        self.hampel_sigma = hampel_sigma
         self.missing_days = {}
         self.logger = Logger("DataProcessor")
 
@@ -105,6 +95,8 @@ class DataProcessor:
         self.expected_bars_per_day = expected_bars
         self.min_day_coverage = min_day_coverage
         self.min_bars_per_day = max(2, ceil(expected_bars * min_day_coverage))
+
+        self.steps = tuple(steps) if steps is not None else ()
 
     def process_all(
         self, input_file: str = "all_prices.csv"
@@ -165,8 +157,11 @@ class DataProcessor:
         ticker_df = self._filter_valid_dates(ticker_df, ticker)
         ticker_df = self._filter_within_day(ticker_df, ticker)
         ticker_df = self._calculate_returns(ticker_df, ticker)
-        ticker_df = self._filter_returns_hampel(ticker_df, ticker)
-        ticker_df = self._clip_extreme_returns(ticker_df, ticker)
+
+        for step in self.steps:
+            ticker_df = step.transform(ticker_df, ticker)
+
+        ticker_df = ticker_df.dropna(subset=["close", "returns"]).reset_index(drop=True)
 
         return ticker_df
 
@@ -391,92 +386,6 @@ class DataProcessor:
         self.logger.info(f"{ticker}: ffill внутри дня - {filled} баров")
         return ticker_df
 
-    @staticmethod
-    def _filter_hampel(
-        series: np.ndarray,
-        window_size: int = 11,
-        sigma: float = 3.0,
-        const: float = 1.4826,
-    ) -> Tuple[np.ndarray, np.ndarray]:
-        """
-        Фильтр Хампеля для обнаружения выбросов.
-
-        Parameters
-        ----------
-        series : np.ndarray
-            Временной ряд
-        window_size : int
-            Полуширина окна (окно = 2w + 1)
-        sigma : float
-            Порог в сигмах
-        const : float
-            Константа нормализации MAD
-
-        Returns
-        -------
-        Tuple[np.ndarray, np.ndarray]
-            (cleaned, flags) — очищенный ряд и флаги для логирования
-        """
-
-        series = np.asarray(series, dtype=float)
-        series_length = len(series)
-        cleaned = series.copy()
-        flags = np.zeros(series_length, dtype=bool)
-
-        for i in range(series_length):
-            if np.isnan(series[i]):
-                continue
-            low, high = max(0, i - window_size), min(series_length, i + window_size + 1)
-            window = series[low:high]
-            r_median = np.nanmedian(window)
-            r_mad = np.nanmedian(np.abs(window - r_median))
-
-            if r_mad == 0:
-                continue
-
-            if np.abs(series[i] - r_median) > sigma * r_mad * const:
-                cleaned[i] = r_median
-                flags[i] = True
-
-        return cleaned, flags
-
-    def _filter_returns_hampel(
-        self, ticker_df: pd.DataFrame, ticker: str = ""
-    ) -> pd.DataFrame:
-        """
-        Применить фильтр Хампеля к доходностям.
-
-        Parameters
-        ----------
-        ticker_df : pd.DataFrame
-            Данные тикера
-        ticker : str
-            Название тикера
-
-        Returns
-        -------
-        pd.DataFrame
-            DataFrame с очищенными доходностями
-        """
-
-        ticker_df = ticker_df.copy()
-        returns = ticker_df["returns"].to_numpy(dtype=float, copy=True)
-        flags = np.zeros(len(returns), dtype=bool)
-        daily_indices = ticker_df.groupby(ticker_df["date"].dt.date).indices.values()
-        for idx in daily_indices:
-            returns[idx], flags[idx] = self._filter_hampel(
-                series=returns[idx],
-                window_size=self.hampel_window,
-                sigma=self.hampel_sigma,
-                const=self.hampel_const,
-            )
-
-        ticker_df["returns"] = returns
-        n = int(flags.sum())
-
-        self.logger.info(f"{ticker}: Hampel filter - {n} замен ({n / len(flags):.3%})")
-        return ticker_df
-
     def _calculate_returns(
         self, ticker_df: pd.DataFrame, ticker: str = ""
     ) -> pd.DataFrame:
@@ -506,38 +415,6 @@ class DataProcessor:
         )
 
         self.logger.info(f"{ticker}: доходности рассчитаны")
-        return ticker_df
-
-    def _clip_extreme_returns(
-        self, ticker_df: pd.DataFrame, ticker: str = ""
-    ) -> pd.DataFrame:
-        """
-        Винсоризация экстремальных доходностей (|returns| > max_return).
-
-        Parameters
-        ----------
-        ticker_df : pd.DataFrame
-            Данные тикера
-        ticker : str
-            Название тикера
-
-        Returns
-        -------
-        pd.DataFrame
-            DataFrame с обрезанными доходностями
-        """
-
-        ticker_df = ticker_df.copy()
-        ticker_df = ticker_df.dropna().reset_index(drop=True)
-        extreme_values = ticker_df["returns"].abs() > self.max_return
-        ticker_df["returns"] = ticker_df["returns"].clip(
-            -self.max_return, self.max_return
-        )
-        n = int(extreme_values.sum())
-        if n != 0:
-            self.logger.warning(
-                f"{ticker}: обрезано {n} доходностей до ±{self.max_return}%"
-            )
         return ticker_df
 
     def _save_rv(self, ticker_df: pd.DataFrame, ticker: str) -> None:

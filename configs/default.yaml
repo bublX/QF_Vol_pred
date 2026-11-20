@@ -18,13 +18,18 @@ data:
 processing:
   min_day_coverage : 0.75
   min_bar_coverage : 0.0
-  max_return: 5
-  hampel_window: 5
-  hampel_sigma: 3.0
-  hampel_const: 1.4826
   session_start: "10:00"
   session_end: "18:50"
   processed_dir: data/processed/10m_default_2014_2025/
+  steps:
+    - name: hampel
+      params: 
+        window_size: 5
+        sigma: 3.0
+        const: 1.4826
+    - name: clip
+      params:
+        max_return: 5
 
 features:
   feature_set: full  # full | har (только rv_1, rv_5, rv_22)

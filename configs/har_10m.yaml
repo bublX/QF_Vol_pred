@@ -6,7 +6,15 @@ features:
 
 processing:
   processed_dir: data/processed/10m_2014_2025/
-  hampel_window: 10
+  steps:
+  - name: hampel
+    params:
+      window_size: 10
+      sigma: 3.0
+      const: 1.4826
+  - name: clip
+    params:
+      max_return: 5
 
 split:
   train_end: '2023-12-31'

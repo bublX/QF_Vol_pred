@@ -94,10 +94,8 @@ def test_processing_defaults_match_data_processor(tmp_path):
     for name in [
         "min_day_coverage",
         "min_bar_coverage",
-        "max_return",
-        "hampel_window",
-        "hampel_sigma",
-        "hampel_const",
+        "session_start",
+        "session_end",
     ]:
         assert getattr(config.processing, name) == defaults[name], name
 
