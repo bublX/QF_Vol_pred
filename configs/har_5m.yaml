@@ -9,6 +9,8 @@ data:
 
 processing:
   processed_dir: data/processed/5m_2014_2025/
+  session_start: "10:00"
+  session_end: "18:40"
 
 split:
   train_end: '2023-12-31'
