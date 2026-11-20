@@ -1,11 +1,8 @@
 import pandas as pd
-import numpy as np
 from source.utils.logger import Logger
 from source.data_processors.bar_aggregator import BarAggregator
 from source.data_processors.steps.base import ProcessingStep
-from source.data_processors.steps.hampel import HampelFilter
-from source.data_processors.steps.clip import ClipReturns
-from typing import Tuple, List, Dict
+from typing import List, Dict
 from pathlib import Path
 from math import ceil
 
@@ -41,6 +38,13 @@ class DataProcessor:
     steps : list[ProcessingStep] | None
         Дополнительные шаги обработки доходностей в порядке выполнения.
         None и пустой список отключают дополнительные шаги.
+    price_steps : list[ProcessingStep] | None
+        Дополнительные шаги до расчета доходностей.
+        None и пустой список отключают дополнительные шаги.
+    returns_calculator : ProcessingStep
+        Обязательный шаг расчёта доходностей. Передаётся по имени.
+        Выполняется после price_steps и перед steps.
+        Должен формировать столбец returns.
     Raises
     ------
     ValueError
@@ -56,6 +60,9 @@ class DataProcessor:
     Минимальное число заполненных баров за день вычисляется как
     max(2, ceil(expected_bars_per_day * min_day_coverage)).
     Количество баров определяется границами сессии и interval.
+
+    Подготовка → проверка покрытия дня → price_steps →
+    returns_calculator → steps → удаление строк без close или returns.
     """
 
     def __init__(
@@ -69,6 +76,9 @@ class DataProcessor:
         session_start: str = "10:00",
         session_end: str = "18:50",
         steps: list[ProcessingStep] | None = None,
+        price_steps: list[ProcessingStep] | None = None,
+        *,
+        returns_calculator: ProcessingStep,
     ):
         self.input_dir = Path(input_dir)
         self.output_dir = Path(output_dir)
@@ -84,6 +94,9 @@ class DataProcessor:
             session_start=session_start,
             session_end=session_end,
         )
+
+        self.returns_calculator = returns_calculator
+        self.price_steps = tuple(price_steps) if price_steps is not None else ()
 
         if not 0 < min_day_coverage <= 1:
             raise ValueError("min_day_coverage должен быть в диапазоне (0, 1]")
@@ -155,8 +168,10 @@ class DataProcessor:
 
         ticker_df = self._prepare_data(ticker_df, ticker)
         ticker_df = self._filter_valid_dates(ticker_df, ticker)
-        ticker_df = self._filter_within_day(ticker_df, ticker)
-        ticker_df = self._calculate_returns(ticker_df, ticker)
+        for step in self.price_steps:
+            ticker_df = step.transform(ticker_df, ticker)
+
+        ticker_df = self.returns_calculator.transform(ticker_df, ticker)
 
         for step in self.steps:
             ticker_df = step.transform(ticker_df, ticker)
@@ -213,12 +228,16 @@ class DataProcessor:
         Returns
         -------
         pd.DataFrame
-            DataFrame с выровненными слотами (10:50:00 - 10:59:59 -> 10:59:59)
+            Таблица с метками конца итоговых слотов минус одна секунда.
+            Например, при interval=10 и session_start="10:00" интервал
+            [10:50:00, 11:00:00) получает метку 10:59:59.
 
         Notes
         -----
-        Если у тикера в слоте несколько свечей, то берется последняя по времени:
-        её close будет считаться ценой закрытия слота.
+        BarAggregator выбирает последнее непустое значение close по времени
+        отдельно для каждого тикера и проверяет покрытие итогового бара.
+        Сетка строится от session_start; последний неполный интервал
+        сессии отбрасывается.
         """
         return self.aggregator.transform(df)
 
@@ -356,66 +375,6 @@ class DataProcessor:
             f"Исключённые дни: {len(missing_days)} тикер-дней, "
             f"{missing_days['date'].nunique()} дат -> missing_days.csv"
         )
-
-    def _filter_within_day(
-        self, ticker_df: pd.DataFrame, ticker: str = ""
-    ) -> pd.DataFrame:
-        """
-        Заполнить пропуски цены последней ценой внутри дня.
-
-        Parameters
-        ----------
-        ticker_df : pd.DataFrame
-            Данные тикера
-        ticker : str
-            Название тикера
-
-        Returns
-        -------
-        pd.DataFrame
-            Отфильтрованный DataFrame
-        """
-
-        ticker_df = ticker_df.copy()
-        missing = int(ticker_df["close"].isna().sum())
-        day = ticker_df["date"].dt.date
-        ticker_df["close"] = ticker_df.groupby(day)["close"].ffill()
-        filled = missing - int(ticker_df["close"].isna().sum())
-        ticker_df = ticker_df.dropna(subset=["close"]).reset_index(drop=True)
-
-        self.logger.info(f"{ticker}: ffill внутри дня - {filled} баров")
-        return ticker_df
-
-    def _calculate_returns(
-        self, ticker_df: pd.DataFrame, ticker: str = ""
-    ) -> pd.DataFrame:
-        """
-        Рассчитать логарифмические доходности.
-
-        Parameters
-        ----------
-        ticker_df : pd.DataFrame
-            Данные тикера
-        ticker : str
-            Название тикера
-
-        Returns
-        -------
-        pd.DataFrame
-            DataFrame с колонкой returns
-        """
-
-        ticker_df = ticker_df.copy()
-        ticker_df["returns"] = (
-            np.log(
-                ticker_df["close"]
-                / ticker_df.groupby(ticker_df["date"].dt.date)["close"].shift(1)
-            )
-            * 100
-        )
-
-        self.logger.info(f"{ticker}: доходности рассчитаны")
-        return ticker_df
 
     def _save_rv(self, ticker_df: pd.DataFrame, ticker: str) -> None:
         """

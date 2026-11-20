@@ -8,7 +8,11 @@ from source.config import Config, load_config
 from source.data_processors.data_loader import DataLoader
 from source.data_processors.data_processor import DataProcessor
 from source.data_processors.dataset_preparer import DatasetPreparer
-from source.data_processors.steps.registry import get_step
+from source.data_processors.steps.registry import (
+    get_step,
+    get_price_step,
+    get_returns_calculator,
+)
 from source.features.data_splitter import DataSplitter
 from source.features.features_engineering import FeatureEngineer
 from source.models.registry import get_model
@@ -89,6 +93,13 @@ def process(config: Config) -> None:
 
     proc_cfg = config.processing
     steps = [get_step(item["name"], item.get("params")) for item in proc_cfg.steps]
+    price_steps = [
+        get_price_step(item["name"], item.get("params"))
+        for item in proc_cfg.price_steps
+    ]
+    returns_calculator = get_returns_calculator(
+        proc_cfg.returns["name"], proc_cfg.returns.get("params")
+    )
     processor = DataProcessor(
         input_dir=config.data.raw_dir,
         output_dir=proc_cfg.processed_dir,
@@ -99,6 +110,8 @@ def process(config: Config) -> None:
         session_start=proc_cfg.session_start,
         session_end=proc_cfg.session_end,
         steps=steps,
+        price_steps=price_steps,
+        returns_calculator=returns_calculator,
     )
 
     processor.process_all(config.data.raw_file)
@@ -223,7 +236,8 @@ def main() -> None:
     """
     Точка входа (вызывается из main.py): uv run python main.py --config configs/<name>.yaml [--stage ...]
 
-    Этапы: load — загрузка с MOEX, process — расчёт RV, train — обучение (по умолчанию).
+    Этапы: prepare — подготовка CSV из архива, load — загрузка с MOEX,
+    process — обработка цен и расчёт RV, train — обучение (по умолчанию).
     """
 
     parser = argparse.ArgumentParser(

@@ -21,6 +21,16 @@ processing:
   session_start: "10:00"
   session_end: "18:50"
   processed_dir: data/processed/10m_default_2014_2025/
+  price_steps:
+    - name: hampel
+      params:
+        column: close
+        window_size: 5
+    - name: forward_fill
+      params: {}
+  returns:
+    name: log_returns
+    params: {}
   steps:
     - name: hampel
       params: 

@@ -2,12 +2,15 @@ import pandas as pd
 import pytest
 
 from source.data_processors.data_processor import DataProcessor
+from source.data_processors.steps.returns import LogReturns
 
 
 @pytest.mark.parametrize("with_duplicate", [False, True])
 def test_aggregation_and_source_duplicates(tmp_path, monkeypatch, with_duplicate):
     monkeypatch.chdir(tmp_path)
-    processor = DataProcessor(source_interval=1, interval=5)
+    processor = DataProcessor(
+        source_interval=1, interval=5, returns_calculator=LogReturns()
+    )
     warnings = []
     monkeypatch.setattr(processor.aggregator.logger, "warning", warnings.append)
 
@@ -40,7 +43,9 @@ def test_aggregation_and_source_duplicates(tmp_path, monkeypatch, with_duplicate
 
 def test_aggregation_respects_session(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    processor = DataProcessor(source_interval=1, interval=7)
+    processor = DataProcessor(
+        source_interval=1, interval=7, returns_calculator=LogReturns()
+    )
 
     raw = pd.DataFrame(
         {
@@ -75,7 +80,9 @@ def test_aggregation_respects_session(tmp_path, monkeypatch):
 )
 def test_day_coverage_depends_on_interval(tmp_path, monkeypatch, interval, required):
     monkeypatch.chdir(tmp_path)
-    processor = DataProcessor(interval=interval, min_day_coverage=0.75)
+    processor = DataProcessor(
+        interval=interval, min_day_coverage=0.75, returns_calculator=LogReturns()
+    )
 
     dates = [
         pd.Timestamp(day)

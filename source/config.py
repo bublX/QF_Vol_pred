@@ -20,7 +20,12 @@ FEATURE_SETS = ["full", "har"]
 @dataclass
 class DataConfig:
     """
-    Параметры загрузки данных с MOEX (см. DataLoader).
+    Параметры подготовки CSV из архива, загрузки с MOEX и интервалов свечей.
+
+    archive_path используется DatasetPreparer. При загрузке DataLoader
+    получает source_interval как код интервала свечей MOEX ISS; для
+    BarAggregator source_interval и interval задают длительности исходных
+    и итоговых свечей в минутах. raw_dir и raw_file определяют путь к CSV.
     """
 
     tickers: list[str]
@@ -47,6 +52,8 @@ class ProcessingConfig:
     session_start: str
     session_end: str
     steps: list[dict[str, Any]]
+    price_steps: list[dict[str, Any]]
+    returns: dict[str, Any]
 
 
 @dataclass

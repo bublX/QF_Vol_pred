@@ -8,11 +8,29 @@ from source.utils.logger import Logger
 
 class HampelFilter(ProcessingStep):
     """
-    Обработка доходностей при помощи фильтра Хампеля
-    внутри каждого дня отдельно
+    Фильтрация выбросов выбранного столбца
+    методом Хампеля отдельно внутри каждого дня.
+
+    Parameters
+    ----------
+    window_size : int
+        Полуширина окна, например значение 5 означает максимум 11 наблюдений
+    sigma : float
+        Множитель порога обнаружения выброса: sigma * const * MAD
+    const : float
+        Константа Хампеля (масштабный коэффициент)
+    column : str
+        Название фильтруемого столбца
     """
 
-    def __init__(self, window_size: int = 5, sigma: float = 3.0, const: float = 1.4826):
+    def __init__(
+        self,
+        window_size: int = 5,
+        sigma: float = 3.0,
+        const: float = 1.4826,
+        column: str = "returns",
+    ):
+
         if (
             not isinstance(window_size, int)
             or isinstance(window_size, bool)
@@ -28,6 +46,7 @@ class HampelFilter(ProcessingStep):
         self.window_size = window_size
         self.sigma = sigma
         self.const = const
+        self.column = column
         self.logger = Logger("HampelFilter")
 
     @staticmethod
@@ -81,19 +100,19 @@ class HampelFilter(ProcessingStep):
 
     def transform(self, data: pd.DataFrame, ticker: str = "") -> pd.DataFrame:
         """
-        Применить фильтр Хампеля к доходностям.
+        Применить фильтр Хампеля к выбранному столбцу.
 
         Parameters
         ----------
         data : pd.DataFrame
-            Данные тикера (столбцы date типа datetime и числовой returns)
+            Данные тикера (столбцы date типа datetime и числовой столбец, заданный column)
         ticker : str
             Название тикера
 
         Returns
         -------
         pd.DataFrame
-            DataFrame с очищенными доходностями
+            DataFrame с отфильтрованным столбцом
         """
 
         data = data.copy()
@@ -101,18 +120,18 @@ class HampelFilter(ProcessingStep):
         if data.empty:
             return data
 
-        returns = data["returns"].to_numpy(dtype=float, copy=True)
-        flags = np.zeros(len(returns), dtype=bool)
+        values = data[self.column].to_numpy(dtype=float, copy=True)
+        flags = np.zeros(len(values), dtype=bool)
         daily_indices = data.groupby(data["date"].dt.date).indices.values()
         for idx in daily_indices:
-            returns[idx], flags[idx] = self._filter_hampel(
-                series=returns[idx],
+            values[idx], flags[idx] = self._filter_hampel(
+                series=values[idx],
                 window_size=self.window_size,
                 sigma=self.sigma,
                 const=self.const,
             )
 
-        data["returns"] = returns
+        data[self.column] = values
         n = int(flags.sum())
 
         self.logger.info(f"{ticker}: Hampel filter - {n} замен ({n / len(flags):.3%})")
