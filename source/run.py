@@ -227,6 +227,22 @@ def run(config: Config) -> pd.DataFrame:
     reports_dir = Path(config.output.reports_dir)
     reports_dir.mkdir(parents=True, exist_ok=True)
     df_results.to_csv(reports_dir / f"{name}_results.csv", index=False)
+
+    summary_path = reports_dir / "mean_metrics.csv"
+    summary = pd.DataFrame([{
+        "Experiment": name,
+        "Model": model_name,
+        "Interval": config.data.interval,
+        **df_results[metrics].mean().to_dict(),
+    }])
+
+    if summary_path.exists():
+        previous = pd.read_csv(summary_path)
+        previous = previous.loc[previous["Experiment"] != name]
+        summary = pd.concat([previous, summary], ignore_index=True)
+
+    summary.to_csv(summary_path, index=False)
+    
     logger.success(f"Результаты сохранены: {reports_dir / f'{name}_results.csv'}")
 
     return df_results
