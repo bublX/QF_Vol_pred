@@ -8,9 +8,9 @@ venv/
 .pytest_cache/
 .coverage
 /data/*
+!/data/raw
 !/data/README.md
 !/data/archives/
-*.csv
 *.xlsx
 *.parquet
 *.db
