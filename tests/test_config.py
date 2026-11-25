@@ -42,7 +42,7 @@ model:
 def test_unknown_key(tmp_path):
     path = write(tmp_path, 'model: {name: rf}\nsplit: {train_endd: "2020-01-01"}\n')
     with pytest.raises(
-        ValueError, match=r"Неизвестные ключи в 'split': \['train_endd'\]"
+            ValueError, match=r"Неизвестные ключи в 'split': \['train_endd'\]"
     ):
         load_config(path)
 
@@ -116,7 +116,7 @@ def test_unknown_feature_set(tmp_path):
         load_config(path)
 
 
-@pytest.mark.parametrize("name", ["har", "rf", "xgb", "lgbm"])
+@pytest.mark.parametrize("name", ["har_5m", "rf_5m", "xgb_5m", "lgbm_5m", "har_10m", "rf_10m", "xgb_10m", "lgbm_10m"])
 def test_experiment_configs_load(name):
     config = load_config(DEFAULT_CONFIG_PATH.parent / f"{name}.yaml")
-    assert config.model.name == name
+    assert config.model.name == name.split("_")[0]
